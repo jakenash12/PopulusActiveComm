@@ -1,28 +1,26 @@
-library(lme4)
-library(lmerTest)
-library(readxl)
+#library(lme4)
+#library(lmerTest)
+#library(readxl)
 library(tidyverse)
-library(vegan)
-library(ape)
-library(ggplot2)
-library(phyloseq)
-library(cowplot)
-library(metagMisc)
-library(dplyr)
-library(magrittr)
-library(RVAideMemoire)
-library(ggsci)
-library(tibble)
-library(car)
-library(moments)
-library(magrittr)
-
-PhyloPath16S="C:/Users/akeja/OneDrive - Duke University/Documents/Duke PhD/Projects/PMI/AUE_2021/AmpliconSeqFiles/16S/phyloseq_input.xlsx"
+#library(vegan)
+#library(ape)
+#library(ggplot2)
+#library(phyloseq)
+#library(cowplot)
+#library(metagMisc)
+#library(dplyr)
+#library(magrittr)
+#library(RVAideMemoire)
+#library(ggsci)
+#library(tibble)
+#library(car)
+#library(moments)
+#library(magrittr)
 
 #reads in SILVA taxonomy and formats it by splitting the single
 #taxonomy column into separate columns for each rank
 silva_tax =
-  read.delim("C:/Users/akeja/OneDrive - Duke University/Documents/Duke PhD/Projects/PMI/AUE_2021/AmpliconSeqFiles/16S/taxonomy_SILVA-138.2.tsv") %>%
+  read.delim("./InputFiles/taxonomy_SILVA-138.2.tsv") %>%
   separate(Taxon,
            into = c("Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species"),
            sep = ";\\s*",
@@ -41,7 +39,7 @@ mito_chloro_otus_silva=
 
 #reads in base metadata, then joins withcomprehensive 
 #sample metadata (soils, sensors, etc)
-samples_df2_16S <- read_excel(PhyloPath16S, sheet = "MappingFile") %>% 
+samples_df2_16S <- read.delim("./InputFiles/Metadata_16S.txt") %>% 
   left_join((select(PRS_Results,-Time, -Site, -Plot, -SiteType)%>%rename_with(~ paste0(., "_PRS"), .cols = -PlotDate)),by="PlotDate") %>% 
   left_join(select(Vegsurvey, -Site), by="Plot") %>% 
   left_join((select(UGA_Results, -Habitat, -Site)%>%rename_with(~ paste0(., "_UGA"), .cols = -Plot)),by="Plot")  %>%

@@ -12,7 +12,7 @@ library(cowplot)
 library(car)
 library(magrittr)
 
-path="C:/Users/akeja/OneDrive - Duke University/Documents/Duke PhD/Projects/PMI/AUE_2021/Teros11DataDownload"
+path="./InputFiles/Teros11DataDownload"
 filelist=list.files(path)
 
 #custom function to rename columns as port # + measurement type
@@ -66,13 +66,11 @@ for (i in filelist) {
     Fulldf=rbind(Fulldf, WorkingDF)
   }
 }
+
+#filters df by time window from 5/19/21 to 10/11/21
 Fulldf %<>%
   filter(Time<"2021-10-11", Time >"2021-05-19") %>% #subsets data by a start and end date 
   mutate(value=as.numeric(value))
-#subsets dataframe to only include air temperature data
-AirTemp_df=
-  Fulldf %>%
-  filter(DataType==" °C Logger Temperature") 
 
 #subsets dataframe to only include data collected by sensors
 #which were plugged into ports 2, 3, or 4
@@ -94,6 +92,7 @@ Sensordf=
 
 
 ##################Data interpolation for soil moisture#################
+#creates wide format soil moisture data frame
 Moistdf_wide =
   Sensordf %>%
   filter(DataType==" m³/m³ Water Content") %>% #selects only data that is of type soil moisture
@@ -105,6 +104,7 @@ Moistdf_wide =
 
 Moistdf_wide=Moistdf_wide[rowSums(is.na(Moistdf_wide))<27,] #removes timepoints for which all plots had NA values - these cannot be interpolated
 
+#makes list of plot names
 SiteNames=
   Moistdf_wide %>% 
   select(-Time) %>%
@@ -118,6 +118,7 @@ interpolated_df_moist=
   data.frame(matrix(ncol=length(colnames_soilmoist),nrow=0)) %>%
   set_colnames(colnames_soilmoist)
 
+#uses loop to run data interpolation script for each plot
 for (i in SiteNames) {
   ActiveSite=str_extract(i, "^..") #identifies which site the plot of interest belongs to by extracting first two characters of plot ID
   SameSites= #identifies names of two other plots from same site as plot of interest 
@@ -164,16 +165,8 @@ for (i in SiteNames) {
   interpolated_df_moist=rbind(interpolated_df_moist,tempdf_moist)
 }
 
-ggplot(tempdf_moist, aes(x=Time)) +
-  geom_point(aes(y=OldVals),color="black") +
-  geom_point(aes(y=SameSite1),color="green") +
-  geom_point(aes(y=SameSite2),color="blue") 
-
-ggplot(interpolated_df_moist, aes(x=Time, y=NewVals,color=DataOrigin)) +
-  geom_point() +
-  facet_wrap(.~Plot) +
-  theme(strip.text.x = element_blank())
-
+#creates plot of soil moisture at each plot over time
+#with averages by site and lines colored by site type
 SoilMoistPlot=
   interpolated_df_moist %>%
   mutate(Site=str_extract(Plot, "^.."),
@@ -197,15 +190,8 @@ SoilMoistPlot=
         axis.ticks=element_line(size=2)) +
   ggtitle("")
 
-
-
-ggplot(filter(interpolated_df_moist,Plot=="MB2", Time>"2021-10-01"), aes(x=Time, y=NewVals,color=DataOrigin)) +
-  geom_point()
-
-interpolated_df_moist %>%
-  filter(Plot=="", DataOrigin=="Interpolated") %>% View
-
 ##################Data interpolation for soil temperature#################
+#converts soil temperature data to wide format
 SoilTempdf_wide =
   Sensordf %>%
   filter(DataType==" °C Soil Temperature") %>% #selects only data that is of type soil temperature
@@ -220,6 +206,7 @@ SoilTempdf_wide=SoilTempdf_wide[rowSums(is.na(SoilTempdf_wide))<27,] #removes ti
 #creates a dataframe of data to exclude. These data looked suspect
 #upon visual examination and are filtered prior to interpolation
 
+#creates list of plot names to loop through
 SiteNames=
   SoilTempdf_wide %>% 
   select(-Time) %>%
@@ -233,6 +220,7 @@ interpolated_df_soiltemp=
   data.frame(matrix(ncol=length(colnames_soiltemp),nrow=0)) %>%
   set_colnames(colnames_soiltemp)
 
+#uses loop to run data interpolation for each plot
 for (i in SiteNames) {
   ActiveSite=str_extract(i, "^..") #identifies which site the plot of interest belongs to by extracting first two characters of plot ID
   SameSites= #identifies names of two other plots from same site as plot of interest 
@@ -279,10 +267,8 @@ for (i in SiteNames) {
   interpolated_df_soiltemp=rbind(interpolated_df_soiltemp,tempdf_temp)
 }
 
-ggplot(interpolated_df_soiltemp, aes(x=Time, y=NewVals,color=DataOrigin)) +
-  geom_point() +
-  facet_wrap(.~Plot)
-
+#makes a plot of average soil temperature over time 
+#average by site, colored by site type
 SoilTempPlot=
   interpolated_df_soiltemp %>%
   mutate(Site=str_extract(Plot, "^.."),
@@ -291,7 +277,7 @@ SoilTempPlot=
   dplyr::summarise(MeanDailySoilTemp=mean(NewVals)) %>% 
   mutate(SiteType=str_extract(Site,"^.")) %>%
   filter(Date>"2021-05-24", Date<"2021-10-08") %>%
-  ggplot(aes(x=Date, y=MeanDailySoiLTemp, color=SiteType, group=Site)) +
+  ggplot(aes(x=Date, y=MeanDailySoilTemp, color=SiteType, group=Site)) +
   scale_color_brewer(palette = "Dark2") +
   geom_line(size=2) +
   geom_vline(xintercept = as.Date("2021-06-04"), linetype=2, size=2) +
@@ -306,8 +292,12 @@ SoilTempPlot=
         axis.ticks=element_line(size=2)) +
   ggtitle("")
 
+#makes a 2-panel plot showing soil temperature and moisture
+#over the season
 plot_grid(SoilTempPlot, SoilMoistPlot, nrow=2)
 
+#calculates the % of data points that are measured,
+#interpolated, and missing (i.e. could not be interpolated)
 table(interpolated_df_soiltemp$DataOrigin) %>%
   as.data.frame %>%
   mutate(Proportion=Freq/sum(Freq))
@@ -323,7 +313,8 @@ table(interpolated_df_soiltemp$DataOrigin) %>%
 StartDate="2021-05-24"
 EndDate="2021-10-08"
 
-#creates a dataframe with seasonal averages of soil temperature
+#creates a dataframe with seasonal averages of 
+#soil temperature by plot
 PlotAvgSoilTemp_temp=
   interpolated_df_soiltemp %>%
   filter(Time>StartDate,Time<EndDate) %>%
@@ -343,6 +334,8 @@ PlotAvgSoilTemp=
   summarise(sd_dailyavgs_soiltemp=sd(SoilTempDailyAvg, na.rm=TRUE)) %>%
   left_join(PlotAvgSoilTemp_temp)
 
+#creates dataframe of seasonal averages of soil
+#moisture grouped by plot
 PlotAvgSoilMoist_temp=
   interpolated_df_moist %>%
   filter(Time>StartDate,Time<EndDate) %>%
@@ -361,365 +354,9 @@ PlotAvgSoilMoist=
   group_by(Plot) %>%
   summarise(sd_dailyavgs_moist=sd(MoistDailyAvg, na.rm=TRUE)) %>%
   left_join(PlotAvgSoilMoist_temp)
-
-#Dataframes with averages of soil temp over 10 days before each sampling date
-Start_T1="2021-05-24"
-End_T1="2021-06-02"
-
-SoilTempT1=
-  interpolated_df_soiltemp %>%
-  filter(Time>Start_T1,Time<End_T1) %>%
-  group_by(Plot) %>%
-  summarise(seasonal_soiltemp=mean(NewVals, na.rm=TRUE)) %>%
-  mutate(Site=str_extract(Plot, "^.."),
-         SiteType=str_extract(Plot, "^."),
-         Time="June")
-
-SoilMoistT1=
-  interpolated_df_moist %>%
-  filter(Time>Start_T1,Time<End_T1) %>%
-  group_by(Plot) %>%
-  summarise(seasonal_moist=mean(NewVals, na.rm=TRUE)) %>%
-  mutate(Site=str_extract(Plot, "^.."),
-         SiteType=str_extract(Plot, "^."),
-         Time="June")
-
-Start_T2="2021-08-07"
-End_T2="2021-08-17"
-
-SoilTempT2=
-  interpolated_df_soiltemp %>%
-  filter(Time>Start_T2,Time<End_T2) %>%
-  group_by(Plot) %>%
-  summarise(seasonal_soiltemp=mean(NewVals, na.rm=TRUE)) %>%
-  mutate(Site=str_extract(Plot, "^.."),
-         SiteType=str_extract(Plot, "^."),
-         Time="August")
-
-SoilMoistT2=
-  interpolated_df_moist %>%
-  filter(Time>Start_T2,Time<End_T2) %>%
-  group_by(Plot) %>%
-  summarise(seasonal_moist=mean(NewVals, na.rm=TRUE)) %>%
-  mutate(Site=str_extract(Plot, "^.."),
-         SiteType=str_extract(Plot, "^."),
-         Time="August")
-
-Start_T3="2021-09-27"
-End_T3="2021-10-07"
-
-SoilTempT3=
-  interpolated_df_soiltemp %>%
-  filter(Time>Start_T3,Time<End_T3) %>%
-  group_by(Plot) %>%
-  summarise(seasonal_soiltemp=mean(NewVals, na.rm=TRUE)) %>%
-  mutate(Site=str_extract(Plot, "^.."),
-         SiteType=str_extract(Plot, "^."),
-         Time="October")
-
-SoilMoistT3=
-  interpolated_df_moist %>%
-  filter(Time>Start_T3,Time<End_T3) %>%
-  group_by(Plot) %>%
-  summarise(seasonal_moist=mean(NewVals, na.rm=TRUE)) %>%
-  mutate(Site=str_extract(Plot, "^.."),
-         SiteType=str_extract(Plot, "^."),
-         Time="October")
-
-SeasonalSoilTempAvg=rbind(SoilTempT1, SoilTempT2, SoilTempT3)
-SeasonalSoilMoistAvg=rbind(SoilMoistT1, SoilMoistT2, SoilMoistT3)
-
-######################Processing of air temp data#####################
-
-#filters out air temperature data that is within growing season start/end dates
-AirTemp_df=
-  Fulldf %>%
-  filter(DataType==" °C Logger Temperature",
-         Time>StartDate,Time<EndDate)
-
-#averages over the whole season are calculated, as well as standard deviations
-#First, a sd on raw data (which includes variation induced by diel cycles) is calculated
-#Then, an sd is calculated on a dataframe of daily averages, to focus
-#on inter-day variation (i.e. seasonality)
-AirTemp_avg_df_temp=
-  AirTemp_df %>%
-  group_by(Site) %>% 
-  summarise(avg_airtemp=mean(value),
-            sd_airtemp=sd(value)) 
-
-AirTemp_avg_df =
-  AirTemp_df %>%
-  mutate(Day=as.Date(Time)) %>%
-  group_by(Site, Day) %>%
-  summarise(dailyavg_airtemp=mean(value)) %>%
-  group_by(Site) %>%
-  summarise(sd_airtemp_daily_avg=sd(dailyavg_airtemp)) %>%
-  left_join(AirTemp_avg_df_temp)
-
-AirTempT1=
-  AirTemp_df %>%
-  filter(Time>Start_T1,Time<End_T1) %>%
-  group_by(Site) %>%
-  summarise(seasonal_airtemp=mean(value, na.rm=TRUE)) %>%
-  mutate(Time="June")
-
-AirTempT2=
-  AirTemp_df %>%
-  filter(Time>Start_T2,Time<End_T2) %>%
-  group_by(Site) %>%
-  summarise(seasonal_airtemp=mean(value, na.rm=TRUE)) %>%
-  mutate(Time="August")
-
-AirTempT3=
-  AirTemp_df %>%
-  filter(Time>Start_T3,Time<End_T3) %>%
-  group_by(Site) %>%
-  summarise(seasonal_airtemp=mean(value, na.rm=TRUE)) %>%
-  mutate(Time="October")
-
-SeasonalAirTempAvg=rbind(AirTempT1, AirTempT2, AirTempT3)
-
-test=
-  SeasonalSoilMoistAvg %>%
-  spread(Time,seasonal_moist)
-
-ggplot(test, aes(x=August, y =October)) +
-  geom_point()
   
-Matric=
-  Fulldf %>%
-  filter(DataType==" kPa Matric Potential") %>%
-  mutate(value=as.numeric(value))
-
-WaterDF =
-  Fulldf %>%
-  filter((DataType==" m³/m³ Water Content" | 
-           DataType==" kPa Matric Potential")) %>%
-  mutate(value=as.numeric(value)) %>%
-  filter((Site=="RA" |
-           Site=="MA" |
-           Site=="HA" |
-           Site=="HC"))
-
-WaterPotentialDF =
-  WaterDF %>%
-  filter(DataType==" kPa Matric Potential") %>%
-  rename(MatricPotential=value)
-
-VolWaterDf=
-  WaterDF %>%
-  filter(DataType==" m³/m³ Water Content") %>%
-  rename(VolWater=value) %>%
-  filter((Plot=="RA3" |
-            Plot=="MA3" |
-            Plot=="HA3" |
-            Plot=="HC3"))
-
-FullwaterDF =
-  WaterPotentialDF %>%
-  left_join(VolWaterDf, by=c("Time", "Site"))
-
-ggplot(FullwaterDF, aes(x=VolWater, y = MatricPotential)) +
-  geom_point(aes(color=Site))
-
-Fulldf %>%
-  filter(DataType==" m³/m³ Water Content") %>%
-  mutate(value=as.numeric(value)) %>%
-  mutate(Drought=value<0.15) %>%
-  filter(value!=0, value<0.5) %>%
-  ggplot(aes(x=Time, y=value, color=Drought, group=Plot)) +
-  geom_line(size=1) +
-  geom_vline(xintercept = as.integer(as.POSIXct("2021-06-04")), col = "black") +
-  geom_vline(xintercept = as.integer(as.POSIXct("2021-08-18")), col = "black") +
-  geom_vline(xintercept = as.integer(as.POSIXct("2021-10-08")), col = "black") +
-  ylab("Volumetric Soil Moisture (m3/m3)") +
-  xlab("Month") +
-  facet_wrap(.~Plot,ncol=3) +
-  scale_color_manual(values=c("black", "red")) +
-  theme_bw() +
-  theme(legend.position="none") +
-  theme(text=element_text(size=16)) +
-  theme(
-    strip.background = element_blank(),
-    strip.text.x = element_blank()) 
-
-Fulldf_wide=
-  Fulldf %>%
-  filter(DataType==" m³/m³ Water Content") %>%
-  filter(value!=0, value<0.5) %>%
-  select(Time, Plot, value) %>% 
-  distinct(Time, Plot, .keep_all = TRUE) %>%
-  pivot_wider(id_cols=Time,names_from=Plot, values_from=value)
-  
-Filldf_gathered=
-  Fulldf_wide %>%
-  gather(Plot, value, -Time) %>%
-  mutate(Site=str_extract(Plot, "^.."),
-         Missing=is.na(value),
-         value=as.numeric(value),
-         PlotID=str_extract(Plot,".$")) %>% 
-  filter(PlotID=="2" |
-           PlotID=="3" |
-           PlotID=="4")
-
-ggplot(Filldf_gathered) +
-  geom_point(aes(x=Time, y=0.1, color=Missing)) +
-  facet_grid(Site~PlotID) 
-
-Fulldf_w_missing=
-  data.frame(Time=unique(Fulldf$Time)) %>%
-  
-
-Fulldf %>%
-  filter(DataType==" m³/m³ Water Content") %>%
-  mutate(value=as.numeric(value)) %>%
-  mutate(Drought=value<0.15) %>%
-  filter(value!=0, value<0.5) %>%
-  ggplot(aes(x=Time, y=value, group=Plot)) +
-  geom_line(size=1) +
-  ylab("Volumetric Soil Moisture (m3/m3)") +
-  xlab("Day") +
-  facet_wrap(.~Plot, ncol=3) 
-
-Fulldf %>%
-  filter(DataType==" m³/m³ Water Content", Plot=="HA3") %>%
-  mutate(value=as.numeric(value)) %>%
-  mutate(Drought=value<0.15) %>%
-  filter(value!=0, value<0.5) %>%
-  ggplot(aes(x=Time, y=value, group=Plot)) +
-  geom_line(size=1) +
-  ylab("Volumetric Soil Moisture (m3/m3)") +
-  xlab("Day") +
-  facet_wrap(.~Plot, ncol=3) +
-  scale_color_manual(values=c("black", "red")) +
-  theme(legend.position="none",
-        text = element_text(size=18))
-
-Fulldf %>%
-  filter(DataType==" m³/m³ Water Content", Plot=="HA3") %>%
-  mutate(value=as.numeric(value)) %>%
-  mutate(Drought=value<0.15) %>%
-  filter(value!=0, value<0.5) %>%
-  ggplot(aes(x=Time, y=value, group=Plot)) +
-  geom_line(size=1) +
-  #geom_vline(xintercept = as.POSIXct(as.Date("2021-08-18")), 
-             #color = "blue", 
-             #lwd = 1,
-             #linetype=2) +
-  #geom_vline(xintercept = as.POSIXct(as.Date("2021-06-03")), 
-             #color = "blue", 
-             #lwd = 1,
-             #linetype=2) +
-  #geom_hline(yintercept=0.15, color="red", size=1) +
-  ylab("Volumetric Soil Moisture (m3/m3)") +
-  xlab("Month") +
-  scale_color_manual(values=c("black", "red")) +
-  theme(legend.position="none",
-        text = element_text(size=18))
-
-Fulldf %>%
-  filter(DataType==" °C Soil Temperature") %>%
-  mutate(value=as.numeric(value),
-         Day=as.Date(Time)) %>%
-  filter(value>0, Day>"2021-05-20") %>% 
-  group_by(SiteType, Day) %>% 
-  summarise(value=mean(value)) %>%
-  ggplot(aes(x=Day, y=value, color=SiteType)) +
-  theme_test() +
-  geom_line(size=1) +
-  geom_vline(xintercept = as.POSIXct(as.Date("2021-08-18")), 
-             color = "blue", 
-             lwd = 1,
-             linetype=2) +
-  geom_vline(xintercept = as.POSIXct(as.Date("2021-06-03")), 
-             color = "blue", 
-             lwd = 1,
-             linetype=2) +
-  ylab("Soil Temperature (C)") +
-  xlab("Month") +
-  theme(text = element_text(size=18))
-  
-Fulldf %>%
-  filter(DataType==" m³/m³ Water Content") %>%
-  mutate(value=as.numeric(value),
-         Day=as.Date(Time)) %>%
-  filter(Day>"2021-05-20"&Day<"2021-10-06") %>% 
-  group_by(SiteType, Day) %>% 
-  summarise(value=mean(value)) %>%
-  ggplot(aes(x=Day, y=value, color=SiteType)) +
-  theme_test() +
-  geom_line(size=1) +
-  ylab("Soil Moisture") +
-  xlab("Month") +
-  theme(text = element_text(size=18))
-
-Fulldf %>%
-  filter(DataType==" m³/m³ Water Content") %>%
-  mutate(value=as.numeric(value)) %>%
-  filter(value!=0, value<0.4, Time >=as.Date("2021-05-27"), Time<=("2021-10-09")) %>%
-  group_by(SiteType, Time) %>%
-  summarise(AvgTemp=mean(value)) %>%
-  ungroup %>%
-  ggplot(aes(x=Time, y=AvgTemp, color=SiteType)) +
-  geom_line(size=1) +
-  geom_vline(xintercept = as.integer(as.POSIXct("2021-06-04")), col = "red", size=1,linetype="dashed") +
-  geom_vline(xintercept = as.integer(as.POSIXct("2021-08-19")), col = "red", size=1,linetype="dashed") +
-  geom_vline(xintercept = as.integer(as.POSIXct("2021-10-08")), col = "red", size=1,linetype="dashed") +
-  ylab("Volumetric Soil Moisture (m3/m3)") +
-  xlab("Day") +
-  theme_test()
-
-Fulldf %>%
-  filter(DataType==" m³/m³ Water Content") %>%
-  mutate(value=as.numeric(value)) %>%
-  filter(value!=0, value<0.4, Time >=as.Date("2021-05-27"), Time<=("2021-10-09")) %>%
-  group_by(Site, Time) %>%
-  summarise(AvgMoist=mean(value)) %>%
-  ungroup %>%
-  mutate(SiteType=str_extract(.$Site, "^.")) %>%
-  ggplot(aes(x=Time, y=AvgMoist, color=SiteType, group=Site)) +
-  geom_line(size=1) +
-  geom_vline(xintercept = as.integer(as.POSIXct("2021-06-04")), col = "red", size=1, linetype = "longdash") +
-  geom_vline(xintercept = as.integer(as.POSIXct("2021-08-19")), col = "red", size=1, linetype = "longdash") +
-  geom_vline(xintercept = as.integer(as.POSIXct("2021-10-08")), col = "red", size=1, linetype = "longdash") +
-  ylab("Volumetric Soil Moisture (m3/m3)") +
-  xlab("Date") +
-  theme_classic() 
-  theme(legend.position="none")
-
-Fulldf %>%
-  filter(DataType==" °C Soil Temperature") %>%
-  mutate(value=as.numeric(value),
-         Date=as.Date(Time)) %>%
-  filter(Time >=as.Date("2021-05-27"), Time<=("2021-10-09")) %>%
-  group_by(Site, Date) %>%
-  summarise(AvgTemp=mean(value)) %>%
-  ungroup %>%
-  mutate(SiteType=str_extract(.$Site, "^.")) %>%
-  ggplot(aes(x=Date, y=AvgTemp, color=SiteType, group=Site)) +
-  geom_line(size=1) +
-  geom_vline(xintercept = as.integer(as.POSIXct("2021-06-04")), col = "black") +
-  geom_vline(xintercept = as.integer(as.POSIXct("2021-08-19")), col = "black") +
-  geom_vline(xintercept = as.integer(as.POSIXct("2021-10-08")), col = "black") +
-  ylab("Volumetric Soil Moisture (m3/m3)") +
-  xlab("Day") +
-  theme_classic()
-
-Fulldf %>%
-  filter(DataType==" °C Soil Temperature") %>%
-  mutate(value=as.numeric(value)) %>%
-  filter(value!=0) %>%
-  group_by(Site, Time) %>%
-  summarise(AvgTemp=mean(value)) %>%
-  ungroup %>%
-  mutate(SiteType=str_extract(.$Site, "^.")) %>%
-  ggplot(aes(x=Time, y=AvgTemp)) +
-  geom_line(size=1) +
-  ylab("Temp (C)") +
-  xlab("Month") +
-  theme_classic() 
-  facet_wrap(.~Plot, ncol=3)
-
+#creates a dataframe with the average within-day
+#fluctuation in soil moisture
 Diurnal_Moisture_Summary =
   Fulldf %>%
   filter(DataType==" m³/m³ Water Content", Time<"2021-10-07", Time>"2021-09-07") %>%
@@ -745,6 +382,8 @@ Diurnal_Moisture_Summary =
                                 M="Mid Elevation",
                                 R="Riparian"))
 
+#creates a dataframe with the average within-day
+#fluctuation in soil temperature
 Diurnal_Temp_Summary =
   Fulldf %>%
   filter(DataType==" °C Soil Temperature", Time < "2021-08-04") %>%
@@ -770,46 +409,7 @@ Diurnal_Temp_Summary =
                                M="Mid Elevation",
                                R="Riparian"))
 
-AirTempSummary =
-  AirTemp_df %>%
-  mutate(value=as.numeric(value),
-         Date = as.Date(Time)) %>%
-  group_by(Site, Date) %>%
-  summarise(avg_temp=mean(value),
-            min_temp=min(value),
-            max_temp=max(value),
-            DiurnalVar=max(value)-min(value)) %>%
-  filter(avg_temp!=0) %>%
-  ungroup %>%
-  group_by(Site) %>%
-  summarise(avg_airtemp=mean(avg_temp),
-            min_airtemp=mean(min_temp),
-            max_airtemp=mean(max_temp),
-            DiurnalVar_airtemp=mean(DiurnalVar)) %>%
-  mutate(SiteType=str_extract(.$Site, "^.")) %>%
-  mutate(SiteType=dplyr::recode(.$SiteType, H="High Elevation", 
-                                M="Mid Elevation",
-                                R="Riparian"))
-
-mod=lm(avg_moist~Site, Diurnal_Moisture_Summary)
-Anova(mod)  
-
-
-pairwise.t.test(Diurnal_Moisture_Summary$avg_moist,Diurnal_Moisture_Summary$SiteType)
-
-AvgTempPlot=
-  ggplot(Diurnal_Temp_Summary, aes(x=Site, y = avg_temp, colour=SiteType)) +
-  geom_boxplot(size=1) +
-  ggtitle("Average Soil Temp") +
-  ylab("Temperature (C)") +
-  theme_test() +
-  theme(legend.position="none")
-
-ggplot(AirTempSummary, aes(x=Site, y=avg_temp, color=SiteType)) +
-  geom_point(aes(size=3)) +  
-  theme_test() +
-  theme(legend.position="none")
-
+#plots average soil temp by site type
 AvgTempPlot=
   ggplot(Diurnal_Temp_Summary, aes(x=SiteType, y = avg_temp, colour=SiteType)) +
   geom_boxplot(size=1) +
@@ -818,7 +418,16 @@ AvgTempPlot=
   theme_test() +
   theme(legend.position="none")
 
+#plots average maximum daily soil temp by site type
+DiurnalTempPlot=
+  ggplot(Diurnal_Temp_Summary, aes(x=SiteType, y = DiurnalVar, colour=SiteType)) +
+  geom_boxplot(size=1) +
+  ylab("") +
+  ggtitle("Maximum Daily Temp") +
+  theme_test() +
+  theme(legend.position="none")
 
+#plots average maximum daily soil temp by site type
 MaxTempPlot=
   ggplot(Diurnal_Temp_Summary, aes(x=SiteType, y = max_temp, colour=SiteType)) +
   geom_boxplot(size=1) +
@@ -827,7 +436,7 @@ MaxTempPlot=
   theme_test() +
   theme(legend.position="none")
 
-
+#plots average minimum daily soil temp by site type
 MinTempPlot=
   ggplot(Diurnal_Temp_Summary, aes(x=SiteType, y = min_temp, colour=SiteType)) +
   geom_boxplot(size=1) +
@@ -850,7 +459,7 @@ AvgMoistPlot=
   ggplot(aes(x=Site, y = avg_moist, colour=SiteType)) +
   geom_boxplot(size=1) +
   ylab("Average Volumetric Moisture") +
-  ggtitle("") +
+  ggtitle("Average Moist") +
   theme_test() +
   theme(legend.position="none")
 
@@ -872,13 +481,6 @@ MinMoistPlot=
   theme_test() +
   theme(legend.position="none") 
 
+#makes multipanel plots showing moist and temp parameters
 plot_grid(AvgTempPlot, MaxTempPlot, MinTempPlot, DiurnalTempPlot)
 plot_grid(AvgMoistPlot, MaxMoistPlot, MinMoistPlot, DiurnalMoistPlot)
-
-ggplot(WorkingDF, aes(x=(as.numeric(`Port6 kPa Matric Potential`)), y=as.numeric(`Port3 m³/m³ Water Content`))) +
-  geom_point()
-
-mod=lm(avg_temp~SiteType, Diurnal_Temp_Summary)
-Anova(mod)
-summary(mod)
-pairwise.t.test(Diurnal_Temp_Summary$avg_temp, Diurnal_Temp_Summary$SiteType)
