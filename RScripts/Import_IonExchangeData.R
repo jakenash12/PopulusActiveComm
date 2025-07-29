@@ -1,12 +1,7 @@
 library(car)
 library(ggplot2)
-#library(dplyr)
-#library(tibble)
 library(cowplot)
-#library(grid)
-#library(gridExtra) 
 library(lme4)
-#library(tidyr)
 library(car)
 
 #imports ion exchange data

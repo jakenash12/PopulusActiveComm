@@ -1,21 +1,10 @@
-#library(lme4)
-#library(lmerTest)
-#library(readxl)
+library(lme4)
 library(tidyverse)
-#library(vegan)
-#library(ape)
-#library(ggplot2)
-#library(phyloseq)
-#library(cowplot)
-#library(metagMisc)
-#library(dplyr)
-#library(magrittr)
-#library(RVAideMemoire)
-#library(ggsci)
-#library(tibble)
-#library(car)
-#library(moments)
-#library(magrittr)
+library(vegan)
+library(phyloseq)
+library(magrittr)
+library(tibble)
+library(car)
 
 #reads in SILVA taxonomy and formats it by splitting the single
 #taxonomy column into separate columns for each rank
@@ -27,7 +16,7 @@ silva_tax =
            fill = "right") %>%
   mutate(across(c(Domain, Phylum, Class, Order, Family, Genus, Species),
                 ~ str_remove(., "^[a-z]__"))) %>%
-  select(-Confidence) %>%
+  dplyr::select(-Confidence) %>%
   column_to_rownames("Feature.ID")
 
 #generates list of mitochondrial and chloroplast OTUs
@@ -37,16 +26,14 @@ mito_chloro_otus_silva=
   filter((Family=="Mitochondria" | Order == "Chloroplast")) %>% 
   rownames(.)
 
-#reads in base metadata, then joins withcomprehensive 
+#reads in base metadata, then joins with comprehensive 
 #sample metadata (soils, sensors, etc)
 samples_df2_16S <- read.delim("./InputFiles/Metadata_16S.txt") %>% 
-  left_join((select(PRS_Results,-Time, -Site, -Plot, -SiteType)%>%rename_with(~ paste0(., "_PRS"), .cols = -PlotDate)),by="PlotDate") %>% 
-  left_join(select(Vegsurvey, -Site), by="Plot") %>% 
-  left_join((select(UGA_Results, -Habitat, -Site)%>%rename_with(~ paste0(., "_UGA"), .cols = -Plot)),by="Plot")  %>%
-  left_join(Summary_moist) %>%
-  left_join(Summary_soiltemp) %>%
-  left_join(select(PlotAvgSoilMoist, Plot, plotavg_moist)) %>%
-  left_join(select(PlotAvgSoilTemp, Plot, plotavg_soiltemp)) %>%
+  left_join((dplyr::select(PRS_Results,-Time, -Site, -Plot, -SiteType)%>%rename_with(~ paste0(., "_PRS"), .cols = -PlotDate)),by="PlotDate") %>% 
+  left_join(dplyr::select(Vegsurvey, -Site), by="Plot") %>% 
+  left_join((dplyr::select(UGA_Results, -Habitat, -Site)%>%rename_with(~ paste0(., "_UGA"), .cols = -Plot)),by="Plot")  %>%
+  left_join(dplyr::select(PlotAvgSoilMoist, Plot, plotavg_moist)) %>%
+  left_join(dplyr::select(PlotAvgSoilTemp, Plot, plotavg_soiltemp)) %>%
   mutate(SiteType=dplyr::recode(.$SiteType, "H"="High Elevation", "R"="Riparian", "M"="Mid Elevation"),
          Time=factor(Time, levels=c("June","August","October")),
          TimeSiteType=paste(Time,SiteType, sep="_"),
@@ -58,23 +45,21 @@ samples_df2_16S <- read.delim("./InputFiles/Metadata_16S.txt") %>%
            "October_HA","October_HB","October_HC","October_MA","October_MB","October_MC","October_RA","October_RB","October_RC")))
 
 #reads in OTU table
-otu_mat_16S <- read_excel(PhyloPath16S,  sheet = "OTU_TABLE") 
+otu_mat_16S <- read.delim("./InputFiles/OTU_table_16S.txt") 
 
 #creates version of otu table only with samples for which
 #there is available soil sensor data
 otu_mat_temp_moist_16S <- 
-  read_excel(PhyloPath16S,  sheet = "OTU_TABLE") %>%
-  select(filter(samples_df2_16S, !is.na(plotavg_soiltemp))$sample,otu)
+  read.delim("./InputFiles/OTU_table_16S.txt") %>%
+  dplyr::select(filter(samples_df2_16S, !is.na(plotavg_soiltemp))$sample,otu)
 
 #second copy of the sample metadata that will be formatted for phyloseq
-samples_df_16S <- read_excel(PhyloPath16S, sheet = "MappingFile") %>% 
-  left_join((select(PRS_Results,-Time, -Site, -Plot, -SiteType)%>%rename_with(~ paste0(., "_PRS"), .cols = -PlotDate)),by="PlotDate") %>% 
-  left_join(select(Vegsurvey, -Site), by="Plot") %>% 
-  left_join((select(UGA_Results, -Habitat, -Site)%>%rename_with(~ paste0(., "_UGA"), .cols = -Plot)),by="Plot")  %>%
-  left_join(Summary_moist) %>%
-  left_join(Summary_soiltemp) %>%
-  left_join(select(PlotAvgSoilMoist, Plot, plotavg_moist)) %>%
-  left_join(select(PlotAvgSoilTemp, Plot, plotavg_soiltemp)) %>%
+samples_df_16S <- read.delim("./InputFiles/Metadata_16S.txt") %>% 
+  left_join((dplyr::select(PRS_Results,-Time, -Site, -Plot, -SiteType)%>%rename_with(~ paste0(., "_PRS"), .cols = -PlotDate)),by="PlotDate") %>% 
+  left_join(dplyr::select(Vegsurvey, -Site), by="Plot") %>% 
+  left_join((dplyr::select(UGA_Results, -Habitat, -Site)%>%rename_with(~ paste0(., "_UGA"), .cols = -Plot)),by="Plot")  %>%
+  left_join(dplyr::select(PlotAvgSoilMoist, Plot, plotavg_moist)) %>%
+  left_join(dplyr::select(PlotAvgSoilTemp, Plot, plotavg_soiltemp)) %>%
   mutate(SiteType=dplyr::recode(.$SiteType, "H"="High Elevation", "R"="Riparian", "M"="Mid Elevation"),
          Time=factor(Time, levels=c("June","August","October")),
          TimeSiteType=paste(Time,SiteType, sep="_"),
@@ -118,7 +103,7 @@ seq_depth_16S <-
   as.data.frame %>%
   rename(SeqCount=".") %>%
   mutate(sample=rownames(.)) %>%
-  left_join(read_excel(PhyloPath16S, sheet = "MappingFile"))
+  left_join(samples_df2_16S)
 
 #creates otu table in format for rarefaction curve
 AUE2021_16S_mat_t=
@@ -187,7 +172,15 @@ AUE2021_16S_alphadiv_summary=
 #sets dodge for plot
 Dodge=0.4
 
+#color palette to match the slightly transparent points w/ dark2 palette
+#used in the ordination
+Alphadivpalette=c("High Elevation" = "#72b599", 
+                  "Mid Elevation" = "#e48c5a",
+                  "Riparian"="#9791c5")
+
 #creates plot of Shannon Div by season and site type
+#plotted without labels so that they can be manually
+#added in Adobe Illustrator
 AlphaDivPlot_16S=
   ggplot(AUE2021_16S_alphadiv_summary, aes(x=Time, y=mean_Shannon, color=SiteType, group=SiteType)) +
   geom_line(size=1.5,position=position_dodge(width=Dodge)) +
@@ -207,12 +200,12 @@ AlphaDivPlot_16S=
   scale_color_manual(values=Alphadivpalette) +
   scale_fill_manual(values=Alphadivpalette)
 
-tiff("C:/Users/akeja/OneDrive - Duke University/Documents/Duke PhD/Projects/PMI/AUE_2021/MetabarcodingManuscript/Misc Figure, Tables, Etc/AlphaDivPlot_16S_SILVA.tiff", 
+tiff("./OutputFiles/AlphaDivPlot_16S_SILVA.tiff", 
      width = 13, height = 11, units = "cm", res=4000)
 AlphaDivPlot_16S
 dev.off()
 
-pdf(file="C:/Users/akeja/OneDrive - Duke University/Documents/Duke PhD/Projects/PMI/AUE_2021/MetabarcodingManuscript/Misc Figure, Tables, Etc/AlphaDivPlot_16S_SILVA.pdf", 
+pdf(file="./OutputFiles/AlphaDivPlot_16S_SILVA.pdf", 
     width = 5.11811, height = 4.33071)
 AlphaDivPlot_16S
 dev.off()
@@ -246,5 +239,5 @@ summary(mod)
 AUE2021_16S_rarefied %>%
   otu_table %>%
   as.data.frame %>% 
-  write.table("C:/Users/akeja/OneDrive - Duke University/Documents/Duke PhD/Projects/PMI/AUE_2021/AmpliconSeqFiles/16S/16S_table_rarefied.tsv", quote=FALSE, sep='/t', col.names = NA)
+  write.table("./OutputFiles/16S_table_rarefied.tsv", quote=FALSE, sep='/t', col.names = NA)
 

@@ -1,0 +1,56 @@
+Genus	Source
+Hyaloscypha	
+Cadophora	Grunig et al 2011
+Meliniomyces	Grunig et al 2011
+Tetracladium	Grunig et al 2011
+Phialocephela	Newsham 2011
+Phialophora	Newsham 2011
+Heteroconium	Narisawa et al 2007
+Cryptosporiopsis	Newsham 2011
+Heteroconium	Newsham 2011
+Leptodontidium 	"Newsham 2011, Grunig et al 2011"
+Crinula	Helotiales
+Chalara	Helotiales
+Cudoniella	Helotiales
+Lachnum	Helotiales
+Neofabraea	Helotiales
+Sclerotinia	Helotiales
+Bulgaria	Helotiales
+Chloridium	Addy et al 2005
+Exophiala	Addy et al 2005
+Oidiodendron	Addy et al 2005
+Scytalidium	Addy et al 2005
+Trichocladium	Addy et al 2005
+Acephala	Grunig et al 2011
+Microdochium	Grunig et al 2011
+Cystodendron	Grunig et al 2011
+Pezoloma	Grunig et al 2011
+Vibrissea	Grunig et al 2011
+Cryptosporiopsis	Grunig et al 2011
+Dermea	Grunig et al 2011
+Didymella	Grunig et al 2011
+Didymosphaeria	Grunig et al 2011
+Embellisia	Grunig et al 2011
+Gaeumannomyces	Grunig et al 2011
+Herpotrichia	Grunig et al 2011
+Leptosphaeria	Grunig et al 2011
+Monodictys	Grunig et al 2011
+Lophiostoma	Grunig et al 2011
+Macrophomina	Grunig et al 2011
+Neonectria	Grunig et al 2011
+Nectria	Grunig et al 2011
+Phoma	Grunig et al 2011
+Pseudocercospora	Grunig et al 2011
+Saccharicola	Grunig et al 2011
+Taeniolella	Grunig et al 2011
+Aquilomyces	Knapp et al 2015
+Darksidea	Knapp et al 2015
+Rhizopycnis	Knapp et al 2012
+Periconia	Knapp et al 2012
+Alternaria	
+Setophoma	
+Curvularia	
+Tricladium	
+Rhexocercosporidium	
+Rhizoscyphus	
+Hymenoscyphus	
