@@ -1,3 +1,7 @@
+#script to perform data import for bacterial 16S data
+#Includes initial data formatting (conversion to 
+#phyloseq format) and alpha diversity analyses
+
 library(lme4)
 library(tidyverse)
 library(vegan)
@@ -18,6 +22,22 @@ silva_tax =
                 ~ str_remove(., "^[a-z]__"))) %>%
   dplyr::select(-Confidence) %>%
   column_to_rownames("Feature.ID")
+
+#reads in SILVA taxonomy and formats it by splitting the single
+#taxonomy column into separate columns for each rank
+#this one is left in df format
+silva_tax_df =
+  read.delim("./InputFiles/taxonomy_SILVA-138.2.tsv") %>%
+  separate(Taxon,
+           into = c("Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species"),
+           sep = ";\\s*",
+           fill = "right") %>%
+  mutate(across(c(Domain, Phylum, Class, Order, Family, Genus, Species),
+                ~ str_remove(., "^[a-z]__"))) %>%
+  dplyr::select(-Confidence) %>%
+  rename("otu"="Feature.ID") %>%
+  mutate(across(everything(), ~ na_if(str_trim(.), ""))) %>%
+  mutate(TaxClass=ifelse(!is.na(Species),Species,ifelse(!is.na(Genus),Genus,ifelse(!is.na(Family),Family,ifelse(!is.na(Order),Order,ifelse(!is.na(Class),Class,ifelse(!is.na(Phylum),Phylum,Domain)))))))
 
 #generates list of mitochondrial and chloroplast OTUs
 #based on SILVA annotations
@@ -80,6 +100,8 @@ otu_mat_16S %<>%
   column_to_rownames("otu")
 silva_tax %<>% 
   filter(!(rownames(.) %in% mito_chloro_otus_silva))
+silva_tax_df %<>%
+  filter(!(otu %in% mito_chloro_otus_silva))
 samples_df_16S %<>% column_to_rownames("sample")
 
 #converts otu tables and tax table into matrices for phyloseq
@@ -128,6 +150,12 @@ ggplot(rarecurve_16S, aes(x=Sample, y=Species, group=Site)) +
 #rarefies otu table to 13407 using random seed to ensure
 #reproducibility
 AUE2021_16S_rarefied = rarefy_even_depth(AUE2021_16S, 13407, rngseed=TRUE)
+
+#writes rarefied OTU table to file
+AUE2021_16S_rarefied %>%
+  otu_table %>%
+  as.data.frame %>% 
+  write.table("./OutputFiles/16S_table_rarefied.tsv", quote=FALSE, sep='/t', col.names = NA)
 
 #creates relativized rarefied dataframe
 AUE2021_16S_rarefied_rel = transform_sample_counts(AUE2021_16S_rarefied, function(x) x / sum(x) )
@@ -200,11 +228,7 @@ AlphaDivPlot_16S=
   scale_color_manual(values=Alphadivpalette) +
   scale_fill_manual(values=Alphadivpalette)
 
-tiff("./OutputFiles/AlphaDivPlot_16S_SILVA.tiff", 
-     width = 13, height = 11, units = "cm", res=4000)
-AlphaDivPlot_16S
-dev.off()
-
+#saves alpha div plot as pdf
 pdf(file="./OutputFiles/AlphaDivPlot_16S_SILVA.pdf", 
     width = 5.11811, height = 4.33071)
 AlphaDivPlot_16S
@@ -234,10 +258,3 @@ summary(mod)
 mod=lmer(Shannon~SiteType*Time +(1|Site), AUE2021_16S_alphadiv_RNA)
 Anova(mod)
 summary(mod)
-
-#writes rarefied OTU table to file
-AUE2021_16S_rarefied %>%
-  otu_table %>%
-  as.data.frame %>% 
-  write.table("./OutputFiles/16S_table_rarefied.tsv", quote=FALSE, sep='/t', col.names = NA)
-
