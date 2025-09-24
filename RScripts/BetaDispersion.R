@@ -5,6 +5,9 @@
 #unique combination of site/season/source and then uses a 
 #mixed model to test whether distance to centroids varies
 
+#This script requires you to have run 16S_Analysis_SILVA.R and
+#ITS_Analysis.R and have the resulting data objects in memory
+
 library(vegan)
 library(lme4)
 library(tidyverse)
@@ -106,7 +109,7 @@ betadisp_16S_plot=
   theme(panel.border = element_rect(linetype = "solid",
                                     colour = "gray20", linewidth = 1.5),
         strip.background = element_blank(),
-        text=element_blank(),
+        #text=element_blank(),
         axis.ticks=element_line(size=1.5, colour = "gray20")) +
   scale_color_manual(values=Betadisp_palette) +
   scale_fill_manual(values=Betadisp_palette) +
