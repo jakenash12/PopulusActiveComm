@@ -35,15 +35,12 @@ mod=lmer(DistCentr~SiteType*Time*source+(1|Plot),
          betadisper_ITS_SiteTimeSource_df)
 Anova(mod)
 
-betadisper_ITS_SiteTimeSource_df %>%
-  ggplot(aes(x=Time, y=DistCentr, color=SiteType)) +
-  geom_boxplot() +
-  facet_grid(.~source)
-
-
+#creates color palette for plotting beta dispersion
 Betadisp_palette=c("High Elevation" = "#60bba0", 
                    "Mid Elevation" = "#e48f4e",
                    "Riparian"="#9f9bca")
+
+#makes plot of fungal ITS beta dispersion by site type, season, and dataset (DNA vs RNA)
 betadisp_ITS_plot=
   betadisper_ITS_SiteTimeSource_df %>%
   group_by(SiteType, Time, source) %>%
@@ -67,34 +64,6 @@ betadisp_ITS_plot=
   scale_fill_manual(values=Betadisp_palette) +
   facet_wrap(.~source)
 
-betadisper_ITS_SiteTimeSource_df %>%
-  select(sample, DistCentr) %>%
-  left_join(AUE2021_alphadiv) %>%
-  filter(!is.na(source)) %>%
-  ggplot(aes(x=Shannon, y=DistCentr)) +
-  geom_point() +
-  facet_wrap(.~source, scales="free") +
-  geom_smooth(method="lm", se=FALSE)
-
-betadisper_ITS_SiteTimeSource_df %>%
-  select(sample, DistCentr) %>%
-  left_join(AUE2021_alphadiv) %>%
-  lm(DistCentr~Shannon+source, .) %>%
-  Anova
-
-betadisper_ITS_SiteTimeSource_df %>%
-  select(sample, DistCentr) %>%
-  left_join(AUE2021_alphadiv) %>%
-  filter(source=="RNA") %>%
-  lm(DistCentr~Shannon, .) %>%
-  summary
-
-betadisper_ITS_SiteTimeSource_df %>%
-  select(sample, DistCentr) %>%
-  left_join(AUE2021_alphadiv) %>%
-  filter(source=="RNA") %>%
-  lm(DistCentr~Shannon, .) %>%
-  summary
 ##############16S Beta Dispersion#############################
 
 #use the variable SiteTimeSource 
@@ -119,6 +88,7 @@ mod=lmer(DistCentr~SiteType*Time*source+(1|Plot),
          betadisper_16S_SiteTimeSource_df)
 Anova(mod)
 
+#makes plot of bacterial 16S beta dispersion by site type, season, and dataset (DNA vs RNA)
 betadisp_16S_plot=
   betadisper_16S_SiteTimeSource_df %>%
   group_by(SiteType, Time, source) %>%
@@ -142,34 +112,14 @@ betadisp_16S_plot=
   scale_fill_manual(values=Betadisp_palette) +
   facet_wrap(.~source)
 
-pdf(file="C:/Users/akeja/OneDrive - Duke University/Documents/Duke PhD/Projects/PMI/AUE_2021/MetabarcodingManuscript/Misc Figure, Tables, Etc/betadisp_16S_plot.pdf", 
+#saves plot of bacterial 16S beta dispersion as pdf to be used in figure
+pdf(file="betadisp_16S_plot.pdf", 
     width = 5.11811, height = 4.33071)
 betadisp_16S_plot
 dev.off()
 
-pdf(file="C:/Users/akeja/OneDrive - Duke University/Documents/Duke PhD/Projects/PMI/AUE_2021/MetabarcodingManuscript/Misc Figure, Tables, Etc/betadisp_ITS_plot.pdf", 
+#saves plot of fungal ITS beta dispersion as pdf to be used in figure
+pdf(file="betadisp_ITS_plot.pdf", 
     width = 5.11811, height = 4.33071)
 betadisp_ITS_plot
 dev.off()
-
-betadisper_16S_SiteTimeSource_df %>%
-  select(sample, DistCentr) %>%
-  left_join(AUE2021_16S_alphadiv) %>%
-  ggplot(aes(x=Shannon, y=DistCentr)) +
-  geom_point() +
-  facet_wrap(.~source, scales="free")
-
-
-betadisper_16S_SiteTimeSource_df %>%
-  select(sample, DistCentr) %>%
-  left_join(AUE2021_16S_alphadiv) %>%
-  filter(source=="RNA") %>%
-  lm(DistCentr~Shannon, .) %>%
-  Anova
-
-betadisper_16S_SiteTimeSource_df %>%
-  select(sample, DistCentr) %>%
-  left_join(AUE2021_16S_alphadiv) %>%
-  filter(source=="RNA") %>%
-  lm(DistCentr~Shannon, .) %>%
-  summary

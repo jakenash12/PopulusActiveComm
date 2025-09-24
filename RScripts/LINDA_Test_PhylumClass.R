@@ -1,7 +1,7 @@
 #Applies the LinDA test for differential abundance based on Zhou et al 2022
 #Does LINDA at Phylum/Class level for bacteria
 #(summarises data to phylum level for everything except
-#Proteobacteria, which is done at Class level)
+#Pseudomonadota (formerly known as Proteobacteria), which is done at Class level)
 #
 #Then does LINDA at Class level for fungi
 
@@ -11,22 +11,23 @@ library(magrittr)
 library(ggplot2)
 library(tibble)
 
-
+#sets p value and LFC cutoff for determining significance for LINDA test
 lfc_cutoff_RvD=1
 p_cutoff_RvD=0.05
 
 #generates taxonomic summary tables from rarefied OTU tables
 
-###########16S summary#################3#################################
+###########16S summary##################################################
+#creates phylum-level 16S summary otu table
 AUE2021_16S_rarefied_phylum=
   AUE2021_16S_rarefied %>%
   otu_table %>%
   as.data.frame %>%
   mutate(otu=rownames(.)) %>%
-  left_join(tax_mat_16S_df) %>% 
+  left_join(silva_tax_df) %>% 
   mutate(Phylum_edit=case_when(
-    (Phylum=="Proteobacteria" & !(is.na(Class))) ~ Class,
-    (Phylum=="Proteobacteria" & (is.na(Class))) ~ "OtherProteobacteria",
+    (Phylum=="Pseudomonadota" & !(is.na(Class))) ~ Class,
+    (Phylum=="Pseudomonadota" & (is.na(Class))) ~ "OtherProteobacteria",
     is.na(Phylum) ~"Unassigned",
     .default=Phylum
   )) %>%
@@ -34,29 +35,35 @@ AUE2021_16S_rarefied_phylum=
   summarise_at(vars(matches('DNA')), sum) %>%  
   column_to_rownames("Phylum_edit")
 
+#creates formatted metadata table
 Linda_16S_phylum_df_meta=
   filter(samples_df2_16S, sample %in% colnames(AUE2021_16S_rarefied_phylum))
 
+#creates formatted metadata table w/ DNA samples only
 Linda_16S_phylum_df_meta_DNA=
   samples_df2_16S %>%
   filter(source=="DNA",
          sample %in% colnames(AUE2021_16S_rarefied_phylum))
 
+#filters phylum-level OTU table to only include DNA samples
 Linda_16S_phylum_df_DNA=
   AUE2021_16S_rarefied_phylum %>%
   dplyr::select(Linda_16S_phylum_df_meta_DNA$sample)
 
+#creates formatted metadata table w/ RNA samples only
 Linda_16S_phylum_df_meta_RNA=
   samples_df2_16S %>%
   filter(source=="cDNA",
          sample %in% colnames(AUE2021_16S_rarefied_phylum))
 
+#filters phylum-level OTU table to only include RNA samples
 Linda_16S_phylum_df_RNA=
   AUE2021_16S_rarefied_phylum %>%
   dplyr::select(Linda_16S_phylum_df_meta_RNA$sample)
 
 
 ###########ITS Summary Tables###################################
+#creates Class-level ITS summary otu table
 AUE2021_ITS_rarefied_class=
   AUE2021_ITS_rarefied %>%
   otu_table %>%
@@ -70,28 +77,34 @@ AUE2021_ITS_rarefied_class=
   summarise_at(vars(matches('DNA')), sum) %>%  
   column_to_rownames("Class_edit")
 
+#creates formatted metadata table
 Linda_ITS_class_df_meta=
   filter(samples_df2, sample %in% colnames(AUE2021_ITS_rarefied_class))
 
+#creates formatted metadata table w/ DNA samples only
 Linda_ITS_class_df_meta_DNA=
   samples_df2 %>%
   filter(source=="DNA",
          sample %in% colnames(AUE2021_ITS_rarefied_class))
 
+#filters phylum-level OTU table to only include DNA samples
 Linda_ITS_class_df_DNA=
   AUE2021_ITS_rarefied_class %>%
   dplyr::select(Linda_ITS_class_df_meta_DNA$sample)
 
+#creates formatted metadata table w/ RNA samples only
 Linda_ITS_class_df_meta_RNA=
   samples_df2 %>%
   filter(source=="cDNA",
          sample %in% colnames(AUE2021_ITS_rarefied_class))
 
+#filters phylum-level OTU table to only include RNA samples
 Linda_ITS_class_df_RNA=
   AUE2021_ITS_rarefied_class %>%
   dplyr::select(Linda_ITS_class_df_meta_RNA$sample)
 
 ############################16S Data - RNA vs DNA ##################
+#Linda test to identify bacterial phyla that differ in abundance between DNA and RNA datasets
 Linda_16S_phylum_source =
   linda(
     feature.dat=AUE2021_16S_rarefied_phylum,
@@ -104,12 +117,14 @@ Linda_16S_phylum_source =
     p.adj.method="fdr",
     alpha=0.05)
 
+#creates dataframe with Linda results and determines significance
 DNAvsRNA_16S_Phylum_sig=
   Linda_16S_phylum_source$output$sourceDNA %>%
   mutate(Phylum=rownames(.)) %>%
   mutate(Sig=ifelse((padj<p_cutoff_RvD&log2FoldChange>lfc_cutoff_RvD),"DNA Enriched",ifelse((padj<p_cutoff_RvD&log2FoldChange< -lfc_cutoff_RvD),"RNA Enriched","Non Significant")))
 
 ############################ITS Data - RNA vs DNA ##################
+#Linda test to identify fungal classes that differ in abundance between DNA and RNA datasets
 Linda_ITS_class_source =
   linda(
     feature.dat=AUE2021_ITS_rarefied_class,
@@ -122,6 +137,7 @@ Linda_ITS_class_source =
     p.adj.method="fdr",
     alpha=0.05)
 
+#creates dataframe with Linda results and determines significance
 DNAvsRNA_ITS_class_sig=
   Linda_ITS_class_source$output$sourceDNA %>%
   mutate(Class=rownames(.)) %>%
@@ -135,7 +151,7 @@ lfc_cutoff_SS=0
 p_cutoff_SS=0.05
 
 ##########################16S Data - DNA#########################
-
+#runs Linda test to identify bacterial phyla that differ by site type +Season in DNA dataset
 Linda_16S_Phylum_SiteType_DNA =
   linda(
     feature.dat=Linda_16S_phylum_df_DNA,
@@ -150,6 +166,8 @@ Linda_16S_Phylum_SiteType_DNA =
     p.adj.method="fdr",
     alpha=0.05)
 
+#runs Linda test to identify bacterial phyla that differ by site type in DNA dataset
+#w/ site type + season refactored to change pairwise comparison
 Linda_16S_Phylum_SiteType_mid_June_DNA =
   linda(
     feature.dat=Linda_16S_phylum_df_DNA,
@@ -164,8 +182,9 @@ Linda_16S_Phylum_SiteType_mid_June_DNA =
     p.adj.method="fdr",
     alpha=0.05)
 
+#creates dataframes with pairwise significance results
 HvR_16S_Phylum_sig_DNA=
-  Linda_16S_Phylum_SiteType_DNA$output$SiteTypeRiparian %>%
+  Linda_16S_Phylum_SiteType_DNA$output$SiteTypeRiparian %>% View
   filter(padj<p_cutoff_SS, (log2FoldChange>lfc_cutoff_SS | log2FoldChange<(-lfc_cutoff_SS))) %>%
   rownames()
 
@@ -194,11 +213,13 @@ JvO_16S_Phylum_sig_DNA=
   filter(padj<p_cutoff_SS, (log2FoldChange>lfc_cutoff_SS | log2FoldChange<(-lfc_cutoff_SS))) %>%
   rownames()
 
+#creates list of phyla that vary by site type
 SiteType_16S_Phylum_variable_DNA=
   c(HvR_16S_Phylum_sig_DNA,HvM_16S_Phylum_sig_DNA,MvR_16S_Phylum_sig_DNA) %>%
   unique %>%
   data.frame(Phylum=.)
 
+#creates list of phyla that vary by season
 Time_16S_Phylum_variable_DNA=
   c(AvJ_16S_Phylum_sig_DNA,AvO_16S_Phylum_sig_DNA,JvO_16S_Phylum_sig_DNA) %>%
   unique %>%
@@ -206,7 +227,7 @@ Time_16S_Phylum_variable_DNA=
 
 
 ##########################16S Data - RNA#########################
-
+#runs Linda test to identify bacterial phyla that differ by site type +Season in RNA dataset
 Linda_16S_Phylum_SiteType_RNA =
   linda(
     feature.dat=Linda_16S_phylum_df_RNA,
@@ -221,6 +242,8 @@ Linda_16S_Phylum_SiteType_RNA =
     p.adj.method="fdr",
     alpha=0.05)
 
+#runs Linda test to identify bacterial phyla that differ by site type in RNA dataset
+#w/ site type + season refactored to change pairwise comparison
 Linda_16S_Phylum_SiteType_mid_June_RNA =
   linda(
     feature.dat=Linda_16S_phylum_df_RNA,
@@ -235,6 +258,7 @@ Linda_16S_Phylum_SiteType_mid_June_RNA =
     p.adj.method="fdr",
     alpha=0.05)
 
+#creates dataframes with pairwise significance results
 HvR_16S_Phylum_sig_RNA=
   Linda_16S_Phylum_SiteType_RNA$output$SiteTypeRiparian %>%
   filter(padj<p_cutoff_SS, (log2FoldChange>lfc_cutoff_SS | log2FoldChange<(-lfc_cutoff_SS))) %>%
@@ -277,6 +301,7 @@ Time_16S_Phylum_variable_RNA=
 
 
 ##########################ITS Data - DNA#########################
+#runs Linda test to identify fungal classes  that differ by site type +Season in DNA dataset
 Linda_ITS_class_SiteType_DNA =
   linda(
     feature.dat=Linda_ITS_class_df_DNA,
@@ -291,6 +316,8 @@ Linda_ITS_class_SiteType_DNA =
     p.adj.method="fdr",
     alpha=0.05)
 
+#runs Linda test to identify fungal classes that differ by site type in DNA dataset
+#w/ site type + season refactored to change pairwise comparison
 Linda_ITS_class_SiteType_mid_June_DNA =
   linda(
     feature.dat=Linda_ITS_class_df_DNA,
@@ -305,6 +332,7 @@ Linda_ITS_class_SiteType_mid_June_DNA =
     p.adj.method="fdr",
     alpha=0.05)
 
+#creates dataframes with pairwise significance results
 HvR_ITS_class_sig_DNA=
   Linda_ITS_class_SiteType_DNA$output$SiteTypeRiparian %>%
   filter(padj<p_cutoff_SS, (log2FoldChange>lfc_cutoff_SS | log2FoldChange<(-lfc_cutoff_SS))) %>%
@@ -346,6 +374,7 @@ Time_ITS_class_variable_DNA=
   data.frame(class=.)
 
 ##########################ITS Data - RNA#########################
+#runs Linda test to identify fungal classes  that differ by site type +Season in RNA dataset
 Linda_ITS_class_SiteType_RNA =
   linda(
     feature.dat=Linda_ITS_class_df_RNA,
@@ -360,6 +389,8 @@ Linda_ITS_class_SiteType_RNA =
     p.adj.method="fdr",
     alpha=0.05)
 
+#runs Linda test to identify fungal classes that differ by site type in RNA dataset
+#w/ site type + season refactored to change pairwise comparison
 Linda_ITS_class_SiteType_mid_June_RNA =
   linda(
     feature.dat=Linda_ITS_class_df_RNA,
@@ -374,6 +405,7 @@ Linda_ITS_class_SiteType_mid_June_RNA =
     p.adj.method="fdr",
     alpha=0.05)
 
+#creates dataframes with pairwise significance results
 HvR_ITS_class_sig_RNA=
   Linda_ITS_class_SiteType_RNA$output$SiteTypeRiparian %>%
   filter(padj<p_cutoff_SS, (log2FoldChange>lfc_cutoff_SS | log2FoldChange<(-lfc_cutoff_SS))) %>%
