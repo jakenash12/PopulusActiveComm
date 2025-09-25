@@ -287,32 +287,3 @@ pdf(file="SpatAutPlot_16S.pdf",
     width = 10, height = 6)
 SpatAutPlot_16S
 dev.off()
-
-
-#generates a distance matrix from environmental factors
-Env_dm_June=
-  Env_cluster_summary_df %>% 
-  left_join(select(samples_df2_16S, sample, Time)) %>%
-  left_join(SampleToPlot_16S) %>% 
-  filter(Time=="June") %>%
-  column_to_rownames("Plot") %>%
-  dplyr::select(-Time, -sample) %>%
-  metaMDSdist(autotransform=FALSE, distance = "manhattan")
-
-Env_dm_August=
-  Env_cluster_summary_df %>% 
-  left_join(select(samples_df2_16S, sample, Time)) %>%
-  left_join(SampleToPlot_16S) %>% 
-  filter(Time=="August") %>%
-  column_to_rownames("Plot") %>%
-  dplyr::select(-Time, -sample) %>%
-  metaMDSdist(autotransform=FALSE, distance = "manhattan")
-
-Env_dm_October=
-  Env_cluster_summary_df %>% 
-  left_join(select(samples_df2_16S, sample, Time)) %>%
-  left_join(SampleToPlot_16S) %>% 
-  filter(Time=="October") %>%
-  column_to_rownames("Plot") %>%
-  dplyr::select(-Time, -sample) %>%
-  metaMDSdist(autotransform=FALSE, distance = "manhattan")
