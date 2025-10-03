@@ -72,7 +72,7 @@ Linda_16S_source =
 #a log2fold change of 1 and an adjusted p-value of 0.01 are used to determine significance
 DNAvsRNA_16S_sig=
   silva_tax_df %>%
-  left_join(Linda_16S_source$output$sourceDNA %>% mutate(otu=rownames(.)))
+  left_join(Linda_16S_source$output$sourceDNA %>% mutate(otu=rownames(.))) %>%
   mutate(Sig=ifelse((padj<p_cutoff_RvD&log2FoldChange>lfc_cutoff_RvD),"DNA Enriched",ifelse((padj<p_cutoff_RvD&log2FoldChange< (-lfc_cutoff_RvD)),"RNA Enriched","Non Significant")))
 
 

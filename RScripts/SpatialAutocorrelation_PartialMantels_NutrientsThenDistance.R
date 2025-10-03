@@ -7,7 +7,8 @@
 #to account for soil properties
 
 #This script requires you to have run 16S_Analysis_SILVA.R,
-#ITS_Analysis.R, SpatialDistanceMatrix.R and have the resulting data objects in memory
+#ITS_Analysis.R, SpatialDistanceMatrix.R, and SoilVarDimensionalReduction.R 
+#and have the resulting data objects in memory
 
 library(vegan) 
 
@@ -41,7 +42,7 @@ Env_dm_October=
   metaMDSdist(autotransform=FALSE, distance = "manhattan")
 
 ###########################################
-# Define combinations
+# Define combinations of season and dataset
 sources <- c("DNA", "cDNA")
 times <- c("June", "August", "October")
 
@@ -170,6 +171,7 @@ for (s in sources) {
   }
 }
 
+#ITS - creates summary df of partial mantel test results for each combo of season x dataset
 partial_summary_ITS <- bind_rows(lapply(names(mantel_partial_ITS_results), function(name) {
   result <- mantel_partial_ITS_results[[name]]
   if (!is.null(result)) {
@@ -181,6 +183,7 @@ partial_summary_ITS <- bind_rows(lapply(names(mantel_partial_ITS_results), funct
   }
 }), .id = "row_id")
 
+#16S - creates summary df of partial mantel test results for each combo of season x dataset
 partial_summary_16S <- bind_rows(lapply(names(mantel_partial_16S_results), function(name) {
   result <- mantel_partial_16S_results[[name]]
   if (!is.null(result)) {

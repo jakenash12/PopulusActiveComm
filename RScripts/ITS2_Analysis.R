@@ -2,6 +2,10 @@
 #Includes initial data formatting (conversion to 
 #phyloseq format) and alpha diversity analyses
 
+#This script requires you to have already run the scripts the SoilSensorDataProcessing.R,
+#Import_IonExchangeData.R, MeanAbsoluteChange.R and Vegsurvey_SoilTest_DataImport.R 
+#and have the data objects loaded into memory
+
 library(fungarium)
 library(lme4)
 library(tidyverse)
@@ -17,8 +21,8 @@ samples_df2 <- read.delim("./InputFiles/Metadata_ITS.txt") %>%
   left_join((dplyr::select(PRS_Results,-Time, -Site, -Plot, -SiteType)%>%rename_with(~ paste0(., "_PRS"), .cols = -PlotDate)),by="PlotDate") %>% 
   left_join(dplyr::select(Vegsurvey, -Site), by="Plot") %>% 
   left_join((dplyr::select(UGA_Results, -Habitat, -Site)%>%rename_with(~ paste0(., "_UGA"), .cols = -Plot)),by="Plot")  %>%
-  left_join(dplyr::select(PlotAvgSoilMoist, Plot, plotavg_moist)) %>%
-  left_join(dplyr::select(PlotAvgSoilTemp, Plot, plotavg_soiltemp)) %>%
+  left_join(Summary_moist) %>%
+  left_join(Summary_soiltemp) %>%
   mutate(SiteType=dplyr::recode(.$SiteType, "H"="High Elevation", "R"="Riparian", "M"="Mid Elevation"),
          Time=factor(Time, levels=c("June","August","October")),
          TimeSiteType=paste(Time,SiteType, sep="_"),
@@ -43,8 +47,8 @@ samples_df <- read.delim("./InputFiles/Metadata_ITS.txt") %>%
   left_join((dplyr::select(PRS_Results,-Time, -Site, -Plot, -SiteType)%>%rename_with(~ paste0(., "_PRS"), .cols = -PlotDate)),by="PlotDate") %>% 
   left_join(dplyr::select(Vegsurvey, -Site), by="Plot") %>% 
   left_join((dplyr::select(UGA_Results, -Habitat, -Site)%>%rename_with(~ paste0(., "_UGA"), .cols = -Plot)),by="Plot")  %>%
-  left_join(dplyr::select(PlotAvgSoilMoist, Plot, plotavg_moist)) %>%
-  left_join(dplyr::select(PlotAvgSoilTemp, Plot, plotavg_soiltemp)) %>%
+  left_join(Summary_moist) %>%
+  left_join(Summary_soiltemp) %>%
   mutate(SiteType=dplyr::recode(.$SiteType, "H"="High Elevation", "R"="Riparian", "M"="Mid Elevation"),
          Time=factor(Time, levels=c("June","August","October")),
          TimeSiteType=paste(Time,SiteType, sep="_"),

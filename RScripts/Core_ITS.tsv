@@ -1,0 +1,9 @@
+otu	Phylum	Class	Order	Family	Genus	Species	TaxClass	DNA	RNA	CoreStatus	Dataset
+1b3753029acde9bf8c79555f4589fcb0	Ascomycota	Leotiomycetes	Helotiales	Helotiales fam Incertae sedis	NA	NA	Helotiales fam Incertae sedis	0.9924812030075187	0.4626865671641791	DNA Core	ITS
+3b6db377eef259ab689e39034aa8e7f6	Ascomycota	Leotiomycetes	Helotiales	Hyaloscyphaceae	Hyaloscypha	Hyaloscypha finlandica	Hyaloscypha finlandica	1	1	Core	ITS
+775bbb8702517493e8b2471f4ab520e0	NA	NA	NA	NA	NA	NA	NA	0.9849624060150376	0.9850746268656716	Core	ITS
+9c048c2352766ccefb8d1c1fbcc56cf6	Ascomycota	Sordariomycetes	Hypocreales	Nectriaceae	Ilyonectria	NA	Ilyonectria	1	0.8059701492537313	DNA Core	ITS
+b2dd1c40b823af719b9c58ad3f8ca4ca	Ascomycota	Eurotiomycetes	Chaetothyriales	Herpotrichiellaceae	Exophiala	Exophiala equina	Exophiala equina	0.9924812030075187	0.5	DNA Core	ITS
+d6f62f9a9f62ae49c42ac211013988a1	Ascomycota	Leotiomycetes	Helotiales	Helotiaceae	Tetracladium	NA	Tetracladium	1	0.7686567164179104	DNA Core	ITS
+e2bca00a92f5ed8493b7811f0dfea657	Ascomycota	Dothideomycetes	Pleosporales	Melanommataceae	Sarimanas	Sarimanas shirakamiense	Sarimanas shirakamiense	0.9624060150375939	0.9104477611940298	DNA Core	ITS
+ee68369cb38a3a0cf72304258cc86964	Ascomycota	Leotiomycetes	Helotiales	Helotiales fam Incertae sedis	NA	NA	Helotiales fam Incertae sedis	0.9624060150375939	0.6417910447761194	DNA Core	ITS
