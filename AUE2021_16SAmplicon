@@ -1,0 +1,226 @@
+####This pipeline contains all scripts to generate the 16S ASV table, representative sequences, and taxonomic assignments
+#The scripts for most of this were done on the Duke DCC cluster with QIIME2 v2022.2. 
+#The SILVA taxonomy assignment was done on the Purdue ANVIL cluster with QIIME2 2025.4
+
+#activates the conda environment
+conda activate qiime2-2022.2
+
+#imports raw sequence files into QIIME using manifest file format
+sbatch --wrap="qiime tools import \
+  --type 'SampleData[PairedEndSequencesWithQuality]' \
+  --input-path /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/qiime_manifest_16S.txt \
+  --output-path /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/paired-end-demux.qza \
+  --input-format PairedEndFastqManifestPhred33V2"
+
+#creates a summary of sequence dataset
+sbatch --wrap="qiime demux summarize \
+  --i-data /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/paired-end-demux.qza \
+  --o-visualization /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/paired-end-demux.qzv"
+
+#Uses cutadapt to trim adapters and primers
+sbatch --partition=scavenger --wrap="qiime cutadapt trim-paired \
+	--i-demultiplexed-sequences /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/paired-end-demux.qza \
+	--p-adapter-f ATTAGAWACCCBDGTAGTCC \
+	--p-front-f GTGCCAGCMGCCGCGGTAA \
+	--p-front-f GTGCCAGCMGCWGCGGTAA \
+	--p-front-f GTGCCAGCMGCCGCGGTCA \
+	--p-front-f GTGKCAGCMGCCGCGGTAA \
+	--p-adapter-r TTACCGCGGCKGCTGMCAC \
+	--p-adapter-r TGACCGCGGCKGCTGGCAC \
+	--p-adapter-r TTACCGCWGCKGCTGGCAC \
+	--p-adapter-r TTACCGCGGCKGCTGGCAC \
+	--p-front-r GGACTACHVGGGTWTCTAAT \
+	--p-error-rate 0.15 \
+	--output-dir /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/paired-end-demux_cutadapt \
+	--verbose"
+
+#creates dataset summary after trimming primers
+sbatch --wrap="qiime demux summarize \
+  --i-data /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/paired-end-demux_cutadapt/trimmed_sequences.qza \
+  --o-visualization /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/paired-end-demux_cutadapt/trimmed_sequences.qzv"
+
+#uses DADA2 to denoise, chimera filter, and call ASVs
+sbatch --mem=50G --partition=scavenger --wrap="qiime dada2 denoise-paired \
+	--i-demultiplexed-seqs /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/paired-end-demux_cutadapt/trimmed_sequences.qza \
+	--p-trunc-len-f 220 \
+	--p-trunc-len-r 120 \
+	--p-trim-left-f 0 \
+	--p-trim-left-r 0 \
+	--output-dir /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/16S_FeatureTable"
+
+#creates visualization of DADA2 denoising
+sbatch --partition=scavenger --wrap="qiime metadata tabulate \
+  --m-input-file /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/16S_FeatureTable/denoising_stats.qza \
+  --o-visualization /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/16S_FeatureTable/denoising_stats.qzv"
+
+#exports ASV table as biom file
+sbatch --partition=scavenger --wrap="qiime tools extract \
+  --input-path /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/16S_FeatureTable/table.qza \
+  --output-path /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/16S_FeatureTable/16STable"
+
+#converts ASV table from biom format to tsv
+sbatch --wrap="biom convert -i /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/16S_FeatureTable/16STable/5a97694d-df48-4339-b741-f6fa0ddada94/data/feature-table.biom -o /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/16S_FeatureTable/exported16SFiles/16S_feature_table.tsv --to-tsv"
+
+#exports representative sequence file as fasta
+sbatch --partition=scavenger --wrap="qiime tools extract \
+  --input-path /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/16S_FeatureTable/representative_sequences.qza \
+  --output-path /work/jan58/AUE2021_16S_Amplicon/Qiime2_workingdirectory/16S_FeatureTable/exported16SFiles/16Sdada2repseqs"
+
+###############SILVA Taxonomy 138.2##################
+#Taxonomy assignment with the SILVA 138.2 database
+
+#There is no pre-trained SILVA 138.2 classifier available so I train my own using rescript for processing.
+
+#these scripts were following this tutorial: https://forum.qiime2.org/t/processing-filtering-and-evaluating-the-silva-database-and-other-reference-sequence-data-with-rescript/15494
+
+#note that this was done using a newer version of QIIME and run on the Purdue ANVIL cluster
+
+#move to Silva directory
+cd /anvil/scratch/x-jnash12/AUE2021_16S_Amplicon/SILVA_138.2
+
+#activate qiime environment at beginning of session
+eval "$(mamba shell hook --shell bash)"
+mamba activate qiime2-amplicon-2025.4
+
+######################Download SILVA 138.2 seqs and taxonomy####################
+#rescript is used to access SILVA data
+
+#!/bin/bash
+#SBATCH -o slurm-%j-GetSILVA.out
+#SBATCH -c 1
+#SBATCH --partition=shared 
+#SBATCH -A BIO230020
+#SBATCH --export=ALL
+#SBATCH -t 4:00:00
+
+qiime rescript get-silva-data \
+    --p-version '138.2' \
+    --p-target 'SSURef_NR99' \
+    --o-silva-sequences silva-138.2-ssu-nr99-rna-seqs.qza \
+    --o-silva-taxonomy silva-138.2-ssu-nr99-tax.qza
+
+
+######################Reverse transcribe SILVA database####################
+
+#!/bin/bash
+#SBATCH -o slurm-%j-RT_SILVA.out
+#SBATCH -c 16
+#SBATCH --partition=shared 
+#SBATCH -A BIO230020
+#SBATCH --export=ALL
+#SBATCH -t 24:00:00
+
+qiime rescript reverse-transcribe \
+    --i-rna-sequences silva-138.2-ssu-nr99-rna-seqs.qza \
+    --o-dna-sequences silva-138.2-ssu-nr99-seqs.qza
+
+######################Culls seqs from SILVA that contain >5 ambiguous bases####################
+
+#!/bin/bash
+#SBATCH -o slurm-%j-Cull_SILVA.out
+#SBATCH -c 16
+#SBATCH --partition=shared 
+#SBATCH -A BIO230020
+#SBATCH --export=ALL
+#SBATCH -t 24:00:00
+
+qiime rescript cull-seqs \
+    --i-sequences silva-138.2-ssu-nr99-seqs.qza \
+    --o-clean-sequences silva-138.2-ssu-nr99-seqs-cleaned.qza
+
+######################Taxon-specific length filtering of SILVA seqs####################
+#taxon-specific length filtering is used to reflect the differences in sequence length amongst taxa
+
+#!/bin/bash
+#SBATCH -o slurm-%j-length_filt_SILVA.out
+#SBATCH -c 16
+#SBATCH --partition=shared 
+#SBATCH -A BIO230020
+#SBATCH --export=ALL
+#SBATCH -t 24:00:00
+
+qiime rescript filter-seqs-length-by-taxon \
+    --i-sequences silva-138.2-ssu-nr99-seqs-cleaned.qza \
+    --i-taxonomy silva-138.2-ssu-nr99-tax.qza \
+    --p-labels Archaea Bacteria Eukaryota \
+    --p-min-lens 900 1200 1400 \
+    --o-filtered-seqs silva-138.2-ssu-nr99-seqs-filt.qza \
+    --o-discarded-seqs silva-138.2-ssu-nr99-seqs-discard.qza 
+
+######################Extracts amplicon of 515f/806R primers####################
+#!/bin/bash
+#SBATCH -o slurm-%j-extract_SILVA.out
+#SBATCH -c 16
+#SBATCH --partition=shared 
+#SBATCH -A BIO230020
+#SBATCH --export=ALL
+#SBATCH -t 24:00:00
+
+qiime feature-classifier extract-reads \
+    --i-sequences silva-138.2-ssu-nr99-seqs-filt.qza \
+    --p-f-primer GTGYCAGCMGCCGCGGTAA \
+    --p-r-primer GGACTACNVGGGTWTCTAAT \
+    --p-n-jobs 2 \
+    --p-read-orientation 'forward' \
+    --o-reads silva-138.2-ssu-nr99-seqs-515f-806r.qza
+
+
+######################Dereplicates identical SILVA seqs w/ same taxonomy####################
+
+#!/bin/bash
+#SBATCH -o slurm-%j-derep_SILVA.out
+#SBATCH -c 16
+#SBATCH --partition=shared 
+#SBATCH -A BIO230020
+#SBATCH --export=ALL
+#SBATCH -t 24:00:00
+
+qiime rescript dereplicate \
+    --i-sequences silva-138.2-ssu-nr99-seqs-515f-806r.qza  \
+    --i-taxa silva-138.2-ssu-nr99-tax.qza \
+    --p-mode 'uniq' \
+    --o-dereplicated-sequences silva-138.2-ssu-nr99-seqs-515f-806r-derep-uniq.qza \
+    --o-dereplicated-taxa silva-138.2-ssu-nr99-tax-derep-515f-806r-uniq.qza
+
+######################Fits taxonomic classifier####################
+
+#!/bin/bash
+#SBATCH -o slurm-%j-fit_SILVA.out
+#SBATCH -c 64
+#SBATCH --partition=shared 
+#SBATCH -A BIO230020
+#SBATCH --export=ALL
+#SBATCH -t 48:00:00
+
+qiime feature-classifier fit-classifier-naive-bayes \
+    --i-reference-reads silva-138.2-ssu-nr99-seqs-515f-806r-derep-uniq.qza \
+    --i-reference-taxonomy silva-138.2-ssu-nr99-tax-derep-515f-806r-uniq.qza \
+    --o-classifier silva-138.2-ssu-nr99-515f-806r-classifier.qza
+
+
+######################Runs the taxonomic classification####################
+#!/bin/bash
+#SBATCH -o slurm-%j-SILVA_classify.out
+#SBATCH --partition=wholenode 
+#SBATCH -A BIO230020
+#SBATCH --export=ALL
+#SBATCH -t 72:00:00
+
+qiime feature-classifier classify-sklearn \
+	--i-reads /anvil/scratch/x-jnash12/AUE2021_16S_Amplicon/repseqs.qza \
+	--i-classifier silva-138.2-ssu-nr99-515f-806r-classifier.qza \
+	--o-classification repseqs_tax_silva-138.2.qza \
+	--p-n-jobs 64
+
+######################Exports taxonomy table####################
+#!/bin/bash
+#SBATCH -o slurm-%j-ExportTax.out
+#SBATCH -c 1
+#SBATCH --partition=shared 
+#SBATCH -A BIO230020
+#SBATCH --export=ALL
+#SBATCH -t 4:00:00
+
+qiime tools extract \
+	--input-path repseqs_tax_silva-138.2.qza \
+	--output-path repseqs_tax_silva-138.2
