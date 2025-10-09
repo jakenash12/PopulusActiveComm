@@ -469,7 +469,10 @@ NMDS_16S_open_plot=
   stat_ellipse(aes(linetype=source, group=source), 
                level=0.95, linewidth=1.5, colour = "gray20")
 
+pdf(file="NMDS_16S_open_plot.pdf", 
+    width = 5.11, height = 5.11)
 NMDS_16S_open_plot
+dev.off()
 
 #conducts test of beta dispersion by site type and
 #season to validate permanova results

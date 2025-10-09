@@ -132,3 +132,7 @@ pdf(file="CoreHeatmap.pdf",
     width = 4, height = 10)
 CoreHeatmap
 dev.off()
+
+#saves list of core microbial members 
+write_delim(Core_16S, "Core_16S.tsv", delim="\t")
+write_delim(Core_ITS, "Core_ITS.tsv", delim="\t")

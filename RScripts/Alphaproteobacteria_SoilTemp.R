@@ -10,7 +10,7 @@
 library(tidyverse)
 library(lme4)
 
-#make the plot queen
+#make the plot 
 Alphaproteobacteria_meansoiltemp_plot=
   AUE2021_16S_rarefied_phylum_sensor_t %>%
   mutate(source=factor(source,levels=c("DNA", "cDNA"))) %>%
@@ -34,7 +34,7 @@ AUE2021_16S_rarefied_phylum_sensor_t %>%
   lmer(Alphaproteobacteria ~ meansoiltemp + (1|Site),.) %>% 
   Anova
 
-#make another plot ya
+#make another plot
 Dothideomycetes_meansoiltemp_plot=
   AUE2021_ITS_rarefied_class_sensor_t %>%
   filter(source=="cDNA") %>%
