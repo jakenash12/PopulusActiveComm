@@ -1,0 +1,382 @@
+
+conda activate qiime2-2022.2
+
+#Downloads raw sequencing data from GCB
+sbatch --wrap="ddsclient download -p Nash_7546_22021801 /work/jan58/AUE2021_ITS_Amplicon"
+
+rclone copy /work/jan58/AUE2021_ITS_Amplicon/Nash_7546_22021801 "remote:Vilgalys Lab/NGS_RAW/Nash_7546_22021801"
+
+sbatch --wrap="qiime tools import \
+  --type 'SampleData[PairedEndSequencesWithQuality]' \
+  --input-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/qiime_manifest.txt \
+  --output-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/paired-end-demux.qza \
+  --input-format PairedEndFastqManifestPhred33V2"
+
+sbatch --wrap="qiime tools import \
+  --type 'SampleData[SequencesWithQuality]' \
+  --input-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/QIIME_manifest_premerged.txt \
+  --output-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/premerged_demux.qza \
+  --input-format SingleEndFastqManifestPhred33V2"
+
+sbatch --partition=scavenger --wrap="qiime tools import \
+  --type 'SampleData[PairedEndSequencesWithQuality]' \
+  --input-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/qiime_manifest_no_DNA127.txt \
+  --output-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/paired-end-demux_no_DNA127.txt.qza \
+  --input-format PairedEndFastqManifestPhred33V2"
+
+sbatch --partition=scavenger --wrap="qiime demux summarize \
+  --i-data /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/paired-end-demux.qza \
+  --o-visualization /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/sequences.qzv"
+
+sbatch --mem=400G -c 8 --partition=scavenger --wrap="qiime itsxpress trim-pair-output-unmerged\
+  --i-per-sample-sequences /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/paired-end-demux_no_DNA127.txt.qza \
+  --p-region ITS2 \
+  --p-taxa F \
+  --o-trimmed /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/ITS_trimmed.qza \
+  --p-threads 8"
+
+sbatch --partition=scavenger --wrap="qiime demux summarize \
+  --i-data /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/ITS_trimmed.qza \
+  --o-visualization /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/ITS_trimmed_sequences.qzv"
+
+sbatch --mem=100G --wrap="qiime quality-filter q-score \
+	--i-demux /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/ITS_trimmed.qza \
+	--o-filtered-sequences /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/ITS_trimmed_QCed.qza \
+	--o-filter-stats /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/QC_stats.qza"
+
+sbatch --partition=scavenger --wrap="qiime demux summarize \
+  --i-data /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/ITS_trimmed_sequences.qzv\
+  --o-visualization /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/ITS_trimmed_sequences.qzv"
+
+pear \
+	-f 121_DNA_S121_L001_R1_001.fastq.gz \
+	-r 121_DNA_S121_L001_R2_001.fastq.gz \
+	-o /work/jan58/AUE2021_ITS_Amplicon/PearTest.fastq
+
+ls Nash_7546_22021801 > filelist
+
+
+sbatch --partition=scavenger --mem=100G --wrap="qiime dada2 denoise-single \
+  --i-demultiplexed-seqs /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/premerged_demux.qza \
+  --p-trunc-len 0 \
+  --output-dir /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/dada2out_premerged \
+  --p-n-threads 0"
+
+sbatch --mem=50G --partition=scavenger --wrap="qiime vsearch cluster-features-de-novo \
+	--i-sequences /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/dada2out_premerged/representative_sequences.qza \
+	--i-table /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/dada2out_premerged/table.qza \
+	--p-perc-identity 0.97 \
+	--p-threads 8 \
+	--o-clustered-table /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_dada2_premerged_otu_table.qza \
+	--o-clustered-sequences /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_dada2_premerged_repseqs.qza"
+
+sbatch -c 8 --mem=200G --wrap="qiime feature-classifier classify-sklearn \
+	--i-reads /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_dada2_premerged_repseqs.qza \
+	--i-classifier /work/jan58/Bio557_Truffle/ITS_dada2/unite_ver8_99_s_all_10.05.2021-Q2-2022.2.qza \
+	--o-classification /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_dada2_premerged_taxonomy.qza \
+	--p-n-jobs 8"
+
+sbatch --partition=scavenger --wrap="qiime tools extract \
+  --input-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_dada2_premerged_taxonomy.qza \
+  --output-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_dada2_premerged_taxonomy"
+
+qiime metadata tabulate \
+--m-input-file denoising_stats.qza \
+--o-visualization denoising_stats_premerged.qzv
+
+qiime metadata tabulate \
+--m-input-file /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_derep_table_premerged.qza \
+--o-visualization /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_derep_table_premerged.qzv
+
+sbatch --mem=100G  --wrap="qiime \
+	vsearch dereplicate-sequences \
+	--i-sequences /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/premerged_demux.qza \
+	--o-dereplicated-table /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_derep_table_premerged.qza \
+	--o-dereplicated-sequences /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_derep_seqs_premerged.qza"
+
+sbatch --mem=50G --partition=scavenger --wrap="qiime vsearch cluster-features-de-novo \
+	--i-sequences /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_derep_seqs_premerged.qza \
+	--i-table /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_derep_table_premerged.qza \
+	--p-perc-identity 0.97 \
+	--p-threads 8 \
+	--o-clustered-table /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_otu_table_premerged.qza \
+	--o-clustered-sequences /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_rep_seqs_premerged.qza"
+
+sbatch --mem=50G --partition=scavenger --wrap="qiime metadata tabulate \
+--m-input-file /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_otu_table_premerged.qza \
+--o-visualization /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_otu_table_premerged.qzv"
+
+sbatch --wrap="qiime tools export \
+  --input-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_otu_table_premerged.qza \
+  --output-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_otu_table_premerged.biom"
+
+sbatch --wrap="qiime tools export \
+  --input-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_dada2_premerged_repseqs.qza \
+  --output-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_dada2_premerged_repseqs.fasta"
+
+sbatch --wrap="qiime tools export \
+  --input-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_dada2_premerged_otu_table.qza \
+  --output-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_dada2_premerged_otu_table.biom"
+
+sbatch --partition=scavenger --mem=50G --wrap="biom convert -i /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_otu_table_premerged.biom/feature-table.biom -o /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_otu_table_premerged.tsv --to-tsv"
+
+sbatch --mem=100G --wrap="qiime dada2 denoise-single \
+  --i-demultiplexed-seqs /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/ITS_trimmed.qza \
+  --p-trunc-len 0 \
+  --output-dir /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/dada2out_singleend \
+  --p-n-threads 0"
+
+qiime metadata tabulate \
+--m-input-file denoising_stats.qza \
+--o-visualization denoising_stats_singleend.qzv
+
+sbatch --mem=100G --wrap="qiime dada2 denoise-paired \
+  --i-demultiplexed-seqs /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/ITS_trimmed_QCed.qza \
+  --p-trunc-len-r 0 \
+  --p-trunc-len-f 0 \
+  --output-dir /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/dada2out_pairedend_QCed \
+  --p-n-threads 0"
+
+sbatch --mem=100G --wrap="qiime vsearch cluster-features-de-novo \
+	--i-sequences /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/dada2out/representative_sequences.qza \
+	--i-table /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/dada2out/table.qza \
+	--p-perc-identity 0.97 \
+	--p-threads 8 \
+	--o-clustered-table /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_otu_table.qza \
+	--o-clustered-sequences /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_rep_seqs.qza"
+
+sbatch --mem=100G --wrap="qiime vsearch cluster-features-de-novo \
+	--i-sequences /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/dada2out_singleend/representative_sequences.qza \
+	--i-table /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/dada2out_singleend/table.qza \
+	--p-perc-identity 0.97 \
+	--p-threads 8 \
+	--o-clustered-table /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_otu_table_singleend.qza \
+	--o-clustered-sequences /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_rep_seqs_singleend.qza"
+
+qiime metadata tabulate \
+--m-input-file /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_otu_table_singleend.qza \
+--o-visualization /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_otu_table_singleend.qzv
+
+sbatch --mem=100G --wrap="qiime feature-classifier classify-sklearn \
+  --i-classifier /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/sh_refs_qiime_ver8_dynamic_04.02.2020_classifier.qza\
+  --i-reads /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_rep_seqs_singleend.qza \
+  --o-classification /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/taxonomy-single-end.qza"
+
+ qiime tools export --input-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/taxonomy-single-end.qza --output-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/taxonomy_singleend
+
+ qiime feature-table tabulate-seqs \
+  --i-data /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_rep_seqs_singleend.qza \
+  --o-visualization /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/rep-seqs_singleend.qzv
+
+qiime tools export \
+  --input-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_otu_table_singleend.qza  \
+  --output-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/exported-feature-table_singleend
+
+biom convert -i /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/exported-feature-table_singleend/feature-table.biom -o /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/exported-feature-table_singleend/feauture-table_singleend.tsv --to-tsv
+
+qiime feature-table tabulate-seqs \
+  --i-data /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_rep_seqs.qza \
+  --o-visualization rep-seqs.qzv
+
+qiime tools export \
+  --input-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/vsearch_otu_table.qza  \
+  --output-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/exported-feature-table
+
+biom convert -i /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/exported-feature-table/feature-table.biom -o /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/exported-feature-table/feauture-table.tsv --to-tsv
+
+#removes lowercase letters from UNITE seq file
+awk '/^>/ {print($0)}; /^[^>]/ {print(toupper($0))}' /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/UNITE_Classifier/sh_qiime_release_s_all_10.05.2021/developer/sh_refs_qiime_ver8_99_s_all_10.05.2021_dev.fasta | tr -d ' ' > /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/UNITE_Classifier/sh_qiime_release_s_all_10.05.2021/developer/sh_refs_qiime_ver8_99_s_all_10.05.2021_dev_uppercase.fasta
+
+#imports UNITE sequence file into QIIME
+sbatch --partition=scavenger --wrap="qiime tools import \
+ --type FeatureData[Sequence] \
+ --input-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/UNITE_Classifier/sh_qiime_release_s_all_10.05.2021/developer/sh_refs_qiime_ver8_99_s_all_10.05.2021_dev_uppercase.fasta \
+ --output-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/UNITE_Classifier/sh_refs_qiime_ver8_99_s_all_10.05.2021.qza"
+
+#imports UNITE taxonomy file into QIIME
+sbatch --partition=scavenger --wrap="qiime tools import \
+ --type FeatureData[Taxonomy] \
+ --input-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/UNITE_Classifier/sh_qiime_release_s_all_10.05.2021/developer/sh_taxonomy_qiime_ver8_99_s_all_10.05.2021_dev.txt \
+ --output-path /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/UNITE_Classifier/sh_taxonomy_qiime_ver8_99_s_all_10.05.2021.qza \
+ --input-format HeaderlessTSVTaxonomyFormat"
+
+#trains the UNITE classifier
+sbatch --partition=scavenger --mem=50G --wrap="qiime feature-classifier fit-classifier-naive-bayes \
+ --i-reference-reads /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/UNITE_Classifier/sh_refs_qiime_ver8_99_s_all_10.05.2021.qza \
+ --i-reference-taxonomy /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/UNITE_Classifier/sh_taxonomy_qiime_ver8_99_s_all_10.05.2021.qza \
+ --o-classifier /work/jan58/AUE2021_ITS_Amplicon/Qiime2_workingdirectory/UNITE_Classifier/UNITE_ver8_99_s_all_10.05.2021_classifier.qza"
+
+#creates a pseudo-phylogeny from ITS taxonomy using the taxonomy_to_tree.pl command from https://github.com/mr-y/my_bioinfPerls
+sbatch --wrap="~/my_bioinfPerls/taxonomy_to_tree.pl -b -f /work/jan58/AUE2021_ITS_Amplicon/Pseudophylogeny/QIIME_taxonomy.txt >ITS_Pseudophylogeny.nwk" 
+
+
+ ##############################Testing out alternative read merging with PEAR and ITSx outside of QIIME##############################################
+ls /work/jan58/AUE2021_ITS_Amplicon/Nash_7546_22021801 | grep "R1_001.fastq.gz" > /work/jan58/AUE2021_ITS_Amplicon/filelist
+sed -i 's/_R1_001.fastq.gz//g' /work/jan58/AUE2021_ITS_Amplicon/filelist
+
+for i in $(cat /work/jan58/AUE2021_ITS_Amplicon/filelist)
+do
+sbatch --wrap="pear \
+	-f /work/jan58/AUE2021_ITS_Amplicon/Nash_7546_22021801/${i}_R1_001.fastq.gz \
+	-r /work/jan58/AUE2021_ITS_Amplicon/Nash_7546_22021801/${i}_R2_001.fastq.gz \
+	-o /work/jan58/AUE2021_ITS_Amplicon/PEARReads/${i}_PEAR.fastq.gz"
+done
+
+for i in $(cat /work/jan58/AUE2021_ITS_Amplicon/filelist)
+do
+mv /work/jan58/AUE2021_ITS_Amplicon/PEARReads/${i}_PEAR.fastq.gz.assembled.fastq /work/jan58/AUE2021_ITS_Amplicon/PEARReads/${i}.assembled.fastq
+done
+
+for i in $(cat /work/jan58/AUE2021_ITS_Amplicon/filelist)
+do
+sbatch --wrap="itsxpress --fastq /work/jan58/AUE2021_ITS_Amplicon/PEARReads/${i}.assembled.fastq --single_end --region ITS2 --taxa Fungi \
+--log /work/jan58/AUE2021_ITS_Amplicon/ITSxpressReads/${i}.logfile.txt --outfile /work/jan58/AUE2021_ITS_Amplicon/ITSxpressReads/${i}.ITS.fastq --threads 2"
+done
+
+#############################Creates a ghost tree phylogeny##################################################
+#goes to working directory
+cd /anvil/scratch/x-jnash12/ghost-tree
+
+#downloads Silva files
+wget https://www.arb-silva.de/fileadmin/silva_databases/release_138_1/Exports/SILVA_138.1_SSURef_NR99_tax_silva_full_align_trunc.fasta.gz
+wget https://www.arb-silva.de/fileadmin/silva_databases/release_138_1/Exports/taxonomy/tax_slv_ssu_138.1.acc_taxid.gz
+wget https://www.arb-silva.de/fileadmin/silva_databases/release_138_1/Exports/taxonomy/tax_slv_ssu_138.1.txt.gz
+gunzip *gz
+
+#generates tab separated silva taxonomy file from fasta file headers
+grep ">"  silva_fungi_only_filtered.txt | sed 's/>//' | sed 's/ /\t/' > silva_taxonomy_headers.tsv
+
+silva_aligned='SILVA_138.1_SSURef_NR99_tax_silva_full_align_trunc.fasta'
+silva_accession='tax_slv_ssu_138.1.acc_taxid'
+silva_taxonomy='tax_slv_ssu_138.1.txt'
+silva_taxonomy_headers='silva_taxonomy_headers.tsv'
+silva_fungi_only='silva_fungi_only.txt'
+silva_fungi_filtered='silva_fungi_only_filtered.txt'
+ITS_seqs='vsearch_dada2_premerged_repseqs.fasta'
+ITS_otu_map_97='ITS_otu_map_97.txt'
+ITS_tax='taxonomy_ghosttree.txt'
+
+sbatch -o slurm-%j-extract-fungi.out --partition=shared --account=BIO230020 --export=ALL -t 24:00:00 -c 1 --wrap="ghost-tree silva extract-fungi $silva_aligned $silva_accession $silva_taxonomy $silva_fungi_only"
+sbatch -o slurm-%j-filter_alignment.out --partition=shared --account=BIO230020 --export=ALL -t 24:00:00 -c 1 --wrap="ghost-tree filter-alignment-positions $silva_fungi_only 0.9 0.8 $silva_fungi_filtered"
+sbatch -o slurm-%j-group_extensions.out --partition=shared --account=BIO230020 --export=ALL -t 24:00:00 -c 1 --wrap="ghost-tree extensions group-extensions $ITS_seqs 1 $ITS_otu_map_97"
+
+sbatch -o slurm-%j-scaffold_hybrid.out --partition=shared --account=BIO230020 --export=ALL -t 24:00:00 -c 1 --wrap="ghost-tree scaffold hybrid-tree-foundation-alignment $ITS_otu_map_97 $ITS_tax $ITS_seqs $silva_fungi_filtered AUE2021_SILVA_ITS_ghosttree"
+sbatch -o slurm-%j-scaffold_hybrid_tree.out --partition=shared --account=BIO230020 --export=ALL -t 24:00:00 -c 1 --wrap="ghost-tree scaffold hybrid-tree-foundation-tree $ITS_otu_map_97 $ITS_tax $ITS_seqs /anvil/scratch/x-jnash12/ghost-tree/AUE2021_SILVA_ITS_ghosttree/nr_foundation_tree_gt.nwk $silva_taxonomy /anvil/scratch/x-jnash12/ghost-tree/AUE2021_SILVA_ITS_ghosttree2"
+sbatch -o slurm-%j-scaffold_hybrid_tree_taxheaders.out --partition=shared --account=BIO230020 --export=ALL -t 24:00:00 -c 1 --wrap="ghost-tree scaffold hybrid-tree-foundation-tree $ITS_otu_map_97 $ITS_tax $ITS_seqs /anvil/scratch/x-jnash12/ghost-tree/AUE2021_SILVA_ITS_ghosttree/nr_foundation_tree_gt.nwk $silva_taxonomy_headers /anvil/scratch/x-jnash12/ghost-tree/AUE2021_SILVA_ITS_ghosttree3"
+
+ghost-tree scaffold hybrid-tree-foundation-tree $ITS_otu_map_80 $ITS_tax $ITS_seqs /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/ghost_tree_output/nr_foundation_tree_gt.nwk $silva_taxonomy /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/ghost_tree_output2
+
+ghost-tree scaffold hybrid-tree-foundation-alignment $ITS_otu_map_97 $ITS_tax $ITS_seqs $silva_fungi_filtered AUE2021_SILVA_ITS_ghosttree
+
+ghost-tree extensions group-extensions $ITS_seqs 1 $ITS_otu_map_80
+
+ghost-tree silva extract-fungi $silva_aligned $silva_accession $silva_taxonomy $silva_fungi_only
+ghost-tree filter-alignment-positions $silva_fungi_only 0.9 0.8 $silva_fungi_filtered
+
+#generates taxonomy file from sequence headers and formats for use with ghost-tree
+grep ">" SILVA_138.1_SSURef_NR99_tax_silva_full_align_trunc.fasta | grep "Fungi"| sed 's/>//' | sed 's/ /\t/' |  sed 's/Eukaryota;Amorphea;Obazoa;Opisthokonta;Nucletmycea;/k__/' | sed 's/;/-p__/' | sed 's/;/-c__/' | sed 's/;/-o__/' | sed 's/;/-f__/' | sed 's/;/-g__/' | sed 's/;/-s__/' | sed 's/-/;/g' | grep "Glomeromycotina" | head
+
+#filters representative sequence fasta file to only include OTUs with taxonomic assignments to fungi
+/hpc/group/vilgalyslab/jan58/faSomeRecords.py --fasta /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/${ITS_seqs} --list /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/tax_filter_list.txt --outfile /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/vsearch_dada2_premerged_repseqs.filtered.fasta
+grep "Fungi" tax_slv_ssu_138.1.txt | sed 's/;\t/\t/' | sed 's/Eukaryota;Amorphea;Obazoa;Opisthokonta;Nucletmycea;/k__/' | sed 's/;/-p__/' | sed 's/;/-c__/' | sed 's/;/-o__/' | sed 's/;/-f__/' | sed 's/;/-g__/' | sed 's/;/-s__/' | sed 's/-/;/g' | head
+
+#sets variable names matching file names
+silva_aligned='SILVA_119_SSURef_Nr99_tax_silva_full_align_trunc.fasta'
+silva_accession='tax_slv_ssu_nr_119.acc_taxid'
+silva_taxonomy='tax_slv_ssu_nr_119.txt'
+silva_fungi_only='silva_fungi_only.txt'
+silva_fungi_filtered='silva_fungi_only_filtered.txt'
+ITS_seqs='vsearch_dada2_premerged_repseqs.filtered.fasta'
+ITS_otu_map_80='ITS_otu_map_80.txt'
+ITS_tax='taxonomy_ghosttree.no_tax_removed.txt'
+
+#Removes all non-fungal samples from Silva alignment
+sbatch --wrap="ghost-tree silva extract-fungi $silva_aligned $silva_accession $silva_taxonomy $silva_fungi_only"
+
+#Filter entropy and gap positions from Silva fungal only alignment
+sbatch -o slurm-%j-silva_filter_entropy_gap.out --wrap="ghost-tree filter-alignment-positions $silva_fungi_only 0.9 0.8 $silva_fungi_filtered"
+
+#group extensions sequences (i.e. OTU representative sequences) at 80% identity
+sbatch -o slurm-%j-cluster_otus_80.out --wrap="ghost-tree extensions group-extensions $ITS_seqs 0.8 $ITS_otu_map_80"
+
+#builds the ghost-tree
+sbatch -o slurm-%j-build_ghosttree.out --wrap="ghost-tree scaffold hybrid-tree-foundation-alignment $ITS_otu_map_80 $ITS_tax $ITS_seqs $silva_fungi_filtered /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/ghost_tree_output"
+
+sbatch -o slurm-%j-build_ghosttree.out --wrap="ghost-tree scaffold hybrid-tree-foundation-tree $ITS_otu_map_80 $ITS_tax $ITS_seqs /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/ghost_tree_output/nr_foundation_tree_gt.nwk $silva_taxonomy /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/ghost_tree_output2"
+
+
+##################
+#an older version of QIIME is used for compatibility with ghost tree
+conda activate qiime2-2019.7
+
+#imports extension sequences
+sbatch --wrap="qiime tools import \
+--input-path /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/vsearch_dada2_premerged_repseqs.filtered.fasta \
+--type FeatureData[Sequence] \
+--output-path /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/vsearch_dada2_premerged_repseqs.filtered.qza"
+
+#imports extension taxonomy
+sbatch --wrap="qiime tools import \
+--input-path /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/taxonomy_ghosttree.no_tax_removed.txt \
+--type FeatureData[Taxonomy] \
+--input-format HeaderlessTSVTaxonomyFormat \
+--output-path /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/taxonomy_ghosttree.no_tax_removed.qza"
+
+#imports silva fasta file and converts from RNA to DNA format
+sbatch --wrap="qiime tools import \
+--input-path /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/SILVA_119_SSURef_Nr99_tax_silva_full_align_trunc.fasta \
+--type FeatureData[AlignedSequence] \
+--input-format AlignedRNAFASTAFormat \
+--output-path /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/SILVA_119_SSURef_Nr99_tax_silva_full_align_trunc.qza"
+
+#imports silva taxonomy
+sbatch --wrap="qiime tools import \
+--input-path /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/tax_slv_ssu_nr_119.txt \
+--type SilvaTaxonomy \
+--output-path /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/tax_slv_ssu_nr_119.qza \
+--input-format SilvaTaxonomyFormat"
+
+#imports silva accession file
+sbatch --wrap="qiime tools import \
+--input-path /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/tax_slv_ssu_nr_119.acc_taxid \
+--type SilvaAccession \
+--output-path /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/tax_slv_ssu_nr_119.acc_taxid.qza \
+--input-format SilvaAccessionFormat"
+
+#Extract fungi only from Silva
+sbatch --wrap="qiime ghost-tree extract-fungi \
+--i-aligned-silva-file /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/SILVA_119_SSURef_Nr99_tax_silva_full_align_trunc.qza \
+--i-accession-file /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/tax_slv_ssu_nr_119.acc_taxid.qza \
+--i-taxonomy-file /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/tax_slv_ssu_nr_119.qza \
+--o-aligned-seqs /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/silva_fungi_only_full_aligned_119.qza"
+
+#filter alignment positions
+sbatch -o slurm-%j-filter_alignment.out --wrap="qiime ghost-tree filter-alignment-positions \
+--i-aligned-sequences-file /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/silva_fungi_only_full_aligned_119.qza \
+--p-maximum-gap-frequency 0.9 \
+--p-maximum-position-entropy 0.8 \
+--o-aligned-seqs /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/silva_fungi_only_full_aligned_119_FILTERED.qza"
+
+#imports extension OTU map
+sbatch --wrap="qiime tools import \
+--input-path /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/ITS_otu_map_80.txt \
+--type OtuMap \
+--output-path /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/ITS_otu_map_80.qza"
+
+#clusters rep seqs at 90%
+sbatch --wrap="qiime ghost-tree extensions-cluster \
+--i-extension-sequences /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/vsearch_dada2_premerged_repseqs.filtered.qza \
+--p-similarity-threshold 0.90 \
+--o-otu-map /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/vsearch_dada2_premerged_repseqs.filtered.otu_map.qza"
+
+sbatch -o slurm-%j-ghosttree_from_alignment.out --wrap="qiime ghost-tree scaffold-hybrid-tree-foundation-alignment \
+--i-otu-map /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/vsearch_dada2_premerged_repseqs.filtered.otu_map.qza \
+--i-extension-taxonomy /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/taxonomy_ghosttree.no_tax_removed.qza \
+--i-extension-sequences /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/vsearch_dada2_premerged_repseqs.filtered.qza \
+--i-foundation-alignment /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/silva_fungi_only_full_aligned_119_FILTERED.qza \
+--o-ghost-tree /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/ghost-tree-foundation-tree-90-otus.qza"
+
+
+sbatch --wrap="qiime tools export \
+  --input-path /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/ghost-tree-foundation-tree-90-otus.qza \
+  --output-path /work/jan58/AUE2021_ITS_Amplicon/ghost_tree/ghost-tree-foundation-tree-90-otus.exported"
